@@ -326,6 +326,12 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .ppbox b{font-size:21px;font-variant-numeric:tabular-nums}
 .ppbox small{font-size:11.5px;color:var(--mute)}
 .hstats.c4{grid-template-columns:repeat(4,1fr)}
+.ifall{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;color:var(--mute)}
+.ifall b{font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+.ifall b.neg{color:var(--neg)}
+.cwbal{background:var(--chip);border-radius:14px;padding:12px 14px;margin:10px 0}
+.cwbal>div{display:flex;justify-content:space-between;margin-top:6px;font-size:15px}
+.cwbal small{display:block;margin-top:8px;font-size:12px;color:var(--mute)}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -393,7 +399,7 @@ function cfg(){
 
 // ---------- row mapping ----------
 const num=v=>v==null?"":+v;
-const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,carried:!!r.carried,cost:num(r.cost),spendId:r.spend_id||null,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repacker:r.repacker||(r.repack_status||r.notes==="Pending Triumph approval"?"Triumph":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
+const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,carried:!!r.carried,carryCost:num(r.carry_cost),cost:num(r.cost),spendId:r.spend_id||null,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repacker:r.repacker||(r.repack_status||r.notes==="Pending Triumph approval"?"Triumph":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
 const mapEntry=r=>({id:r.id,partner:r.partner,amount:+r.amount,kind:r.kind||"buy",to:r.to_partner||"",date:r.entry_date||"",note:r.note||"",cardId:r.card_id,createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
 const cardRow=r=>{const o=cardRow0(r);if(state&&state.hasRepack){o.repack_status=r.repack||null;o.repack_date=r.repack?(r.repackDate||todayISO()):null}if(state&&state.hasRepacker)o.repacker=r.repack?(r.repacker||state.settings.repackers[0]):null;if(state&&state.hasCost){o.cost=(r.cost===""||r.cost==null)?null:+r.cost;o.spend_id=r.spendId||null}return o};
 const cardRow0=r=>({date_purchased:r.date||null,cert:r.cert||null,description:r.desc||"",owner:r.owner,market_value:r.mv===""?null:+r.mv,consignor_pct:+r.pct,sold:!!r.sold,sale_type:r.sold?(r.saleType||"sold"):null,sold_price:(r.soldPrice===""||r.soldPrice==null)?null:+r.soldPrice,sold_date:r.soldDate||null,trade_cash:(r.sold&&r.saleType==="traded"&&r.tradeCash!==""&&r.tradeCash!=null)?+r.tradeCash:null,notes:r.notes||""});
@@ -455,7 +461,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=32;
+const APP_VERSION=34;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -511,22 +517,27 @@ const lotCostsOf=w=>{let m=lcCache.get(w);if(!m){m=lotCosts(w);lcCache.set(w,m)}
 const payoutOf=c=>Math.round((+c.mv||0)*(+c.pct||0))/100;
 const cashIn=c=>c.saleType==="traded"?(+c.tradeCash||0):(+c.soldPrice||0);
 function calc(w){
-  const stock=w.cards.filter(c=>!c.sold&&!c.carried),sold=w.cards.filter(c=>c.sold),carriedN=w.cards.filter(c=>!c.sold&&c.carried).length;
-  const mv=sum(stock,c=>c.mv),due=sum(stock,payoutOf),proceeds=sum(sold,cashIn);
-  const spent=sum(w.spend.filter(x=>x.kind!=="loan"),x=>x.amount),paid=sum(w.payouts,x=>x.amount);
+  // slabs carried out of a week count at their payout there; in the next week they arrive with that payout as their cost
+  const stock=w.cards.filter(c=>!c.sold&&!c.carried),sold=w.cards.filter(c=>c.sold),out=w.cards.filter(c=>!c.sold&&c.carried),carriedN=out.length;
+  const mv=sum(stock,c=>c.mv),due=sum(stock,payoutOf),proceeds=sum(sold,cashIn),carriedOut=round2(sum(out,payoutOf)),carryIn=round2(sum(w.cards,c=>+c.carryCost||0)),carryInDone=round2(sum(w.cards.filter(c=>c.sold||c.carried||c.repack==="accepted"),c=>+c.carryCost||0));
+  const spent=sum(w.spend.filter(x=>x.kind!=="loan"&&x.kind!=="carry"),x=>x.amount),paid=sum(w.payouts,x=>x.amount),cost=round2(spent+carryIn);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),ssp=sum(so,c=>c.soldPrice);
   const acc=stock.filter(c=>c.repack==="accepted"),pend=stock.filter(c=>c.repack==="pending"),accBy={};
   acc.forEach(c=>{const n=c.repacker||"Repacker";accBy[n]=round2((accBy[n]||0)+payoutOf(c))});
-  return{soldProfit:round2(proceeds+sum(acc,payoutOf)-spent),unsoldProfit:round2(due-spent),carriedN,accBy,accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length-pend.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
+  const accDue=sum(acc,payoutOf);
+  // a carried-in slab's cost only counts once it sells, is accepted or moves on again; until then its value already sits in last week's balance
+  return{soldProfit:round2(proceeds+accDue+carriedOut-spent-carryInDone),unsoldProfit:round2(due-cost),carriedN,carriedOut,carryIn,cost,accBy,accN:acc.length,accDue,pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length-pend.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds+carriedOut-cost),rate:mv>0?spent/mv*100:null};
 }
 // each partner gets back what they spent plus an equal share of the profit; payouts already made come off that
 function pcalc(w,p){
-  // a loan between partners moves money from one to the other without counting as spend
-  const spent=round2(sum(w.spend.filter(x=>x.partner===p),x=>x.amount)-sum(w.spend.filter(x=>x.kind==="loan"&&x.to===p),x=>x.amount));
-  const paid=sum(w.payouts.filter(x=>x.partner===p),x=>x.amount);
-  // still owed = what they spent + half the profit from what has sold - what they have already been paid
-  const share=round2(calc(w).soldProfit/Math.max(1,state.settings.partners.length));
-  return{spent,paid,share,left:round2(spent+share-paid)};
+  // a loan moves money between partners without counting as spend; "Balance from last week" is carried in as is
+  const mine=w.spend.filter(x=>x.partner===p);
+  const spent=round2(sum(mine.filter(x=>x.kind!=="carry"),x=>x.amount)-sum(w.spend.filter(x=>x.kind==="loan"&&x.to===p),x=>x.amount));
+  const opening=round2(sum(mine.filter(x=>x.kind==="carry"),x=>x.amount));
+  const paid=sum(w.payouts.filter(x=>x.partner===p),x=>x.amount),t=calc(w),n=Math.max(1,state.settings.partners.length);
+  // owed from sales so far = balance from last week + what they spent + half the sold profit - what they have already been paid
+  const share=round2(t.soldProfit/n),expShare=round2(t.profit/n);
+  return{spent,paid,opening,share,expShare,left:round2(opening+spent+share-paid),ifAll:round2(opening+spent+expShare-paid)};
 }
 const cardLabel=c=>(c.desc||"(no description)")+(c.cert?" | cert "+c.cert:"");
 const whoText=o=>{if(!o||!o.createdBy)return "";let s="Added by "+o.createdBy+" on "+fmtTime(o.createdAt);if(o.updatedAt&&o.updatedAt!==o.createdAt)s+=" | Last edited by "+o.updatedBy+" on "+fmtTime(o.updatedAt);return esc(s)};
@@ -564,11 +575,11 @@ const stampCols=o=>[o.createdBy||"",o.createdAt?fmtTime(o.createdAt):"",o.update
 const CARD_HEAD=["Week","Date Purchased","PSA Cert #","Item Description","Owner","Market Value","Consignor %","Consignor Payout","Status","Repacker","Repacker Status","Sold Price / Trade Value","Cash Received","% of Market","Received In Trade For (Cert)","Sold Date","Notes","Photos","Added By","Added At","Last Edited By","Last Edited At"];
 const cardRows=(w,label)=>{const byId=new Map(w.cards.map(c=>[c.id,c]));return w.cards.map(c=>{const st=c.sold?(c.saleType==="traded"?"Traded":"Sold"):"In stock";const from=c.fromCardId&&byId.get(c.fromCardId);return [label,fmtDate(c.date),c.cert,c.desc,c.owner,round2(+c.mv||0),+c.pct||0,round2(payoutOf(c)),st,c.repack?c.repacker:"",c.repack?({pending:"Pending",accepted:"Accepted",rejected:"Rejected"})[c.repack]:"",c.sold?round2(+c.soldPrice||0):"",c.sold?round2(cashIn(c)):"",c.sold&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null?round2(+c.soldPrice/+c.mv*100):"",from?from.cert:"",c.sold?fmtDate(c.soldDate):"",c.notes||"",attachN(c.id),...stampCols(c)]})};
 const MONEY_HEAD=["Week","Type","Partner","Amount","Date","Note","Added By","Added At","Last Edited By","Last Edited At"];
-const moneyRows=(w,label)=>[...w.spend.map(x=>[label,x.kind==="loan"?"Loan":"Spend",x.kind==="loan"?x.partner+" to "+x.to:x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
+const moneyRows=(w,label)=>[...w.spend.map(x=>[label,x.kind==="loan"?"Loan":x.kind==="carry"?"Balance from last week":"Spend",x.kind==="loan"?x.partner+" to "+x.to:x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
 function summaryRows(w,label){
   const t=calc(w);
-  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit, all slabs (sales + unsold at payout - spent)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],["Sold profit (sales + accepted by repackers - spent)",t.soldProfit],["Expected profit, unsold slabs only (unsold at payout - spent)",t.unsoldProfit],[],["Partner","Spent","Half of sold profit","Paid out","Still owed"]];
-  state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.share,c.paid,c.left])});
+  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit, all slabs (sales + unsold at payout - spent)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],["Carried in from last week (slab cost at payout)",t.carryIn],["Carried to next week (payout value)",t.carriedOut],["Sold profit (sales + accepted + carried to next week - spent - carried-in cost)",t.soldProfit],["Expected profit, unsold slabs only (unsold at payout - spent)",t.unsoldProfit],[],["Partner","Balance from last week","Spent","Half of sold profit","Paid out","Owed from sales so far","If everything sells"]];
+  state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.opening,c.spent,c.share,c.paid,c.left,c.ifAll])});
   return rows;
 }
 const fileTag=()=>todayISO();
@@ -748,7 +759,7 @@ function cardRowHTML(c,edit,view){
   const pre=edit==="sel"?'<span class="selc'+(picked?" on":"")+'">'+(picked?ic("check",15):"")+"</span>":"";
   const first=n?attachList(c.id)[0]:null;
   const th='<div class="thumbsm '+(first?"":oc)+'">'+(first?'<img data-path="'+esc(first.path)+'" alt="">':ic("cards",20))+"</div>";
-  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Carried to next week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+costPill;
+  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Carried to next week</span>':"")+(+c.carryCost?'<span class="badge ok">From last week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+costPill;
   return '<div class="row'+(act?"":" static")+(picked?" picked":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
 function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"&&c.repack!=="pending"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
@@ -800,7 +811,7 @@ function cardsView(){
 }
 function entryRow(x,kind,act){
   const n=attachN(x.id),pay=kind!=="spend",loan=!pay&&x.kind==="loan";
-  return '<div class="row'+(act?"":" static")+'"'+(act?' data-act="edit-entry" data-kind="'+kind+'" data-id="'+x.id+'"':"")+'><div class="thumbsm ent'+(pay||loan?" pay":"")+'">'+ic(pay||loan?"send":"cart",18)+'</div><div class="main"><div class="desc one">'+esc(x.partner)+(loan?" to "+esc(x.to):"")+(loan?'<span class="badge rp-pending" style="margin-left:6px">Loan</span>':act?"":'<span class="badge ok" style="margin-left:6px">'+(pay?"Payout":"Spend")+"</span>")+'</div><div class="sub">'+fmtDate(x.date)+(x.note?" | "+esc(x.note):"")+(x.updatedBy?" | "+esc(x.updatedBy):"")+"</div>"+(n?'<div class="pills"><span class="badge ok">'+n+" photo"+(n>1?"s":"")+"</span></div>":"")+'</div><div class="amt"><b>'+money(+x.amount||0)+"</b></div></div>";
+  return '<div class="row'+(act?"":" static")+'"'+(act?' data-act="edit-entry" data-kind="'+kind+'" data-id="'+x.id+'"':"")+'><div class="thumbsm ent'+(pay||loan?" pay":"")+'">'+ic(pay||loan?"send":"cart",18)+'</div><div class="main"><div class="desc one">'+esc(x.partner)+(loan?" to "+esc(x.to):"")+(loan?'<span class="badge rp-pending" style="margin-left:6px">Loan</span>':x.kind==="carry"?'<span class="badge rp-accepted" style="margin-left:6px">From last week</span>':act?"":'<span class="badge ok" style="margin-left:6px">'+(pay?"Payout":"Spend")+"</span>")+'</div><div class="sub">'+fmtDate(x.date)+(x.note?" | "+esc(x.note):"")+(x.updatedBy?" | "+esc(x.updatedBy):"")+"</div>"+(n?'<div class="pills"><span class="badge ok">'+n+" photo"+(n>1?"s":"")+"</span></div>":"")+'</div><div class="amt"><b>'+money(+x.amount||0)+"</b></div></div>";
 }
 function ledgerList(list,kind){
   if(!list.length)return emptyBox(kind==="spend"?"cart":"send",kind==="spend"?"No buys or spend yet.":"No payouts yet.");
@@ -829,14 +840,15 @@ function activityView(){
   (list.length?out+(list.length>=200?'<p class="hint">Showing the latest 200. Export CSV for everything.</p>':""):emptyBox("activity",scope==="week"?"Nothing yet this week. Tap All time to see earlier weeks.":"No activity yet."));
 }
 function partnerTiles(w){
-  return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),due=c.spent+Math.max(0,c.share),pct=due>0?Math.min(100,Math.max(0,c.paid/due*100)):0;return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Still owed</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk"><span>Spent</span><span>'+money(c.spent)+'</span><span>+ Half profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span>- Paid</span><span>'+money(c.paid)+"</span></div></div>"}).join("")+"</div>";
+  return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),due=Math.max(0,c.ifAll+c.paid),pct=due>0?Math.min(100,Math.max(0,c.paid/due*100)):0;
+    return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Owed from sales so far</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk">'+(c.opening?'<span>From last week</span><span class="'+(c.opening<0?"neg":"")+'">'+money(c.opening)+"</span>":"")+'<span>Spent</span><span>'+money(c.spent)+'</span><span>+ Half profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span>- Paid</span><span>'+money(c.paid)+'</span></div><div class="ifall"><span>If everything sells</span><b class="'+(c.ifAll<0?"neg":"")+'">'+money(c.ifAll)+"</b></div></div>"}).join("")+"</div>";
 }
 // filter chips for the Money lists: by partner, plus loans for spend
 function moneyFilter(kind,list){
   const P=state.settings.partners,cur=(ui.mf||{})[kind]||"";
   const opts=[["","All"],...P.map(p=>[p,p])];if(kind==="spend"&&list.some(x=>x.kind==="loan"))opts.push(["__loan","Loans"]);
   const pick=cur==="__loan"?list.filter(x=>x.kind==="loan"):cur?list.filter(x=>x.partner===cur||(x.kind==="loan"&&x.to===cur)):list;
-  const tot=sum(pick.filter(x=>x.kind!=="loan"),x=>x.amount);
+  const tot=sum(pick.filter(x=>x.kind!=="loan"&&x.kind!=="carry"),x=>x.amount);
   const chips=list.length?'<div class="chips mf">'+opts.map(o=>'<button class="chip '+(cur===o[0]?"on":"")+'" data-act="money-f" data-kind="'+kind+'" data-id="'+esc(o[0])+'">'+esc(o[1])+"</button>").join("")+'</div><div class="mftot">'+pick.length+(pick.length===1?" entry":" entries")+(cur==="__loan"?"":" | "+money(tot))+"</div>":"";
   return chips+(list.length&&!pick.length?emptyBox(kind==="spend"?"cart":"send","Nothing for this filter."):ledgerList(pick,kind));
 }
@@ -858,10 +870,10 @@ function moneyView(){
 }
 function tilesFor(t){
   const line=(lbl,v,how)=>'<div class="xrow"><div><b>'+lbl+'</b><small>'+how+'</small></div><b>'+money(v)+"</b></div>";
-  return '<div class="hero"><span>Sold profit</span><b class="big'+(t.soldProfit<0?" neg":"")+'">'+money(t.soldProfit)+'</b><div class="brk"><span>Sales '+money(t.proceeds)+'</span><span>+ Accepted by repackers '+money(t.accDue)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="xlist">'+line("Expected profit, all slabs",t.profit,"Sales + unsold at payout "+money(t.due)+" - spent")+line("Expected profit, unsold slabs only",t.unsoldProfit,"Unsold at payout "+money(t.due)+" - spent")+"</div>"+'</div><div class="tiles">'+tile("Market value",money(t.mv),(t.stockN+t.pendN+t.accN)+" unsold"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
+  return '<div class="hero"><span>Sold profit</span><b class="big'+(t.soldProfit<0?" neg":"")+'">'+money(t.soldProfit)+'</b><div class="brk"><span>Sales '+money(t.proceeds)+'</span><span>+ Accepted by repackers '+money(t.accDue)+'</span>'+(t.carriedOut?'<span>+ Carried to next week '+money(t.carriedOut)+"</span>":"")+'<span>- Spent '+money(t.spent)+'</span>'+(t.carryIn?'<span>- Carried-in slabs '+money(t.carryIn)+"</span>":"")+'</div><div class="xlist">'+line("Expected profit, all slabs",t.profit,"Sales + unsold at payout "+money(t.due)+" - spent")+line("Expected profit, unsold slabs only",t.unsoldProfit,"Unsold at payout "+money(t.due)+" - spent")+"</div>"+'</div><div class="tiles">'+tile("Market value",money(t.mv),(t.stockN+t.pendN+t.accN)+" unsold"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
-  return partnerTiles(w)+'<p class="hint">Still owed = what each partner spent + half the profit from what has sold - what they have already been paid.</p>';
+  return partnerTiles(w)+'<p class="hint">Owed from sales so far = balance from last week + what each partner spent + half the profit from what has sold (sales, slabs repackers accepted, slabs carried to next week at payout) - what they have already been paid. If everything sells uses every unsold slab at its payout.</p>';
 }
 function exportButtons(id){
   const b=(k,l)=>'<button class="qbtn" data-act="exp" data-kind="'+k+'" data-id="'+id+'">'+ic("download")+l+"</button>";
@@ -1656,39 +1668,26 @@ function bulkDeleteModal(){
     removeFiles(paths);ui.sel=null;closeModal();await refreshRender();toast(plural(ok,"card")+" deleted");
   });
 }
+// closing a week saves it to History and starts an empty week; nothing carries over
 function closeWeekModal(){
   const w=state.week,label="Week of "+fmtDate(w.start)+" - "+fmtDate(todayISO());
-  const t=calc(w),unsold=w.cards.filter(c=>!c.sold);
-  const pick=new Set(unsold.filter(c=>c.repack!=="accepted").map(c=>c.id));
-  const tag=c=>c.repack==="accepted"?'<span class="badge rp-accepted">Taken by '+esc(c.repacker||"repacker")+"</span>":c.repack==="rejected"?'<span class="badge rp-rejected">Not taken</span>':c.repack==="pending"?'<span class="badge rp-pending">Pending</span>':'<span class="badge ok">In stock</span>';
-  const el=modal('<h2>Close this week</h2><p class="hint">Saves '+w.cards.length+" cards, "+w.spend.length+" spend and "+w.payouts.length+" payout entries to History for everyone (spent "+money(t.spent)+"), then resets.</p><form id=\"wf\">"+field("Name",'<input name="label" value="'+esc(label)+'">')+
-    (unsold.length?'<label class="chk"><input type="checkbox" name="carry"'+(pick.size?" checked":"")+'>Carry unsold slabs over to the new week</label><div id="cwpick"><div class="cwbar"><span id="cwn"></span><span><button class="linkbtn" type="button" id="cwall">All</button> <button class="linkbtn" type="button" id="cwnone">None</button></span></div><p class="hint" style="margin:0 0 6px">Checked slabs move to next week. Slabs a repacker took are unchecked to start.</p><div class="cwlist">'+unsold.map(c=>'<label class="cwrow"><input type="checkbox" data-cid="'+c.id+'"'+(pick.has(c.id)?" checked":"")+'><span class="main"><span class="desc">'+esc(c.desc||"(no description)")+'</span><span class="sub">'+(c.cert?"Cert "+esc(c.cert)+" | ":"")+money(payoutOf(c))+" payout</span></span>"+tag(c)+"</label>").join("")+"</div></div>":'<p class="hint">Every card is sold, so nothing carries over.</p>')+
+  const t=calc(w),unsold=w.cards.filter(c=>!c.sold&&c.repack!=="accepted").length;
+  const el=modal('<h2>Close this week</h2><p class="hint">Saves '+w.cards.length+" cards, "+w.spend.length+" spend and "+w.payouts.length+" payout entries to History for everyone (spent "+money(t.spent)+"), then starts an empty week.</p><form id=\"wf\">"+field("Name",'<input name="label" value="'+esc(label)+'">')+
+    (unsold?'<p class="hint">'+plural(unsold,"slab")+" not sold or accepted yet. They stay in this week's History and do not move to the new week.</p>":"")+
     '<div class="actions"><button class="btn" type="submit">Continue</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
-  const f=$("#wf",el),box=$("#cwpick",el);
-  const sync=()=>{if(!box)return;box.hidden=!f.carry.checked;$("#cwn",el).textContent=pick.size+" of "+unsold.length+" selected"};
-  if(box){
-    f.carry.addEventListener("change",sync);
-    box.querySelectorAll("[data-cid]").forEach(x=>x.addEventListener("change",()=>{x.checked?pick.add(x.dataset.cid):pick.delete(x.dataset.cid);sync()}));
-    const setAll=on=>{box.querySelectorAll("[data-cid]").forEach(x=>{x.checked=on;on?pick.add(x.dataset.cid):pick.delete(x.dataset.cid)});sync()};
-    $("#cwall",el).addEventListener("click",()=>setAll(true));$("#cwnone",el).addEventListener("click",()=>setAll(false));
-    sync();
-  }
+  const f=$("#wf",el);
   f.addEventListener("submit",e=>{
-    e.preventDefault();const name=f.label.value.trim()||label,ids=f.carry&&f.carry.checked?[...pick]:[],keep=ids.length,carry=keep>0;
-    el.innerHTML='<div class="grab"></div><div class="dzic" style="background:var(--warn);color:var(--warn-ink)">'+ic("history",26)+'</div><h2 class="center">Close the week for everyone?</h2><p class="hint center"><b>'+esc(name)+'</b> moves to History and a fresh week starts on every phone.</p><div class="counts"><div><b>'+w.cards.length+'</b><span>cards</span></div><div><b>'+(w.spend.length+w.payouts.length)+'</b><span>money entries</span></div><div><b>'+money(t.profit)+'</b><span>expected profit</span></div></div><p class="hint center">'+(carry?keep+" unsold "+(keep===1?"slab carries":"slabs carry")+" over to the new week.":"Nothing carries over. The new week starts empty.")+'</p><label class="chk"><input type="checkbox" id="cwclear" checked>Also clear the activity log</label><p class="hint" style="margin:2px 0 0 30px">Keeps storage small. <button class="linkbtn" id="cwaud" type="button" style="padding:0">Download it as a CSV first</button></p><div class="actions"><button class="btn" id="cwyes" type="button">Yes, close week</button><button class="btn sec" id="cwback" type="button">Go back</button></div>';
+    e.preventDefault();const name=f.label.value.trim()||label;
+    el.innerHTML='<div class="grab"></div><div class="dzic" style="background:var(--warn);color:var(--warn-ink)">'+ic("history",26)+'</div><h2 class="center">Close the week for everyone?</h2><p class="hint center"><b>'+esc(name)+'</b> moves to History and a fresh, empty week starts on every phone.</p><div class="counts"><div><b>'+w.cards.length+'</b><span>cards</span></div><div><b>'+(w.spend.length+w.payouts.length)+'</b><span>money entries</span></div><div><b>'+money(t.soldProfit)+'</b><span>sold profit</span></div></div><label class="chk"><input type="checkbox" id="cwclear" checked>Also clear the activity log</label><p class="hint" style="margin:2px 0 0 30px">Keeps storage small. <button class="linkbtn" id="cwaud" type="button" style="padding:0">Download it as a CSV first</button></p><div class="actions"><button class="btn" id="cwyes" type="button">Yes, close week</button><button class="btn sec" id="cwback" type="button">Go back</button></div>';
     $("#cwback",el).addEventListener("click",()=>closeWeekModal());
     $("#cwaud",el).addEventListener("click",()=>exportAudit());
     $("#cwyes",el).addEventListener("click",async()=>{
       el.querySelectorAll("button").forEach(b=>b.disabled=true);
-      const clear=$("#cwclear",el).checked,allUnsold=keep===unsold.length;let note="";
+      const clear=$("#cwclear",el).checked;let note="";
       const call=async a=>{try{return await sb.rpc("close_week",a)}catch(x){return{error:x}}};
       const missing=r=>r&&r.error&&(r.error.code==="PGRST202"||/close_week/.test(String(r.error.message||"")));
-      let r=await call({p_label:name,p_carry:carry,p_clear_activity:clear,p_carry_ids:carry?ids:null});
-      if(missing(r)){
-        if(carry&&!allUnsold){toast("Run upgrade-6.sql in Supabase to carry only some slabs, then try again");el.querySelectorAll("button").forEach(b=>b.disabled=false);return}
-        r=await call({p_label:name,p_carry:carry,p_clear_activity:clear});
-        if(missing(r)){r=await call({p_label:name,p_carry:carry});if(!(r&&r.error)&&clear)note=" Run upgrade-6.sql so the activity log clears on reset."}
-      }
+      let r=await call({p_label:name,p_carry:false,p_clear_activity:clear});
+      if(missing(r)){r=await call({p_label:name,p_carry:false});if(!(r&&r.error)&&clear)note=" Run upgrade-6.sql so the activity log clears on reset."}
       if(r&&r.error){toast(errText(r.error));el.querySelectorAll("button").forEach(b=>b.disabled=false);return}
       closeModal();ui.tab="history";ui.top=true;await refreshRender();toast("Week saved to History"+(clear&&!note?". Activity log cleared.":".")+note);
     });
@@ -1897,8 +1896,8 @@ function doExportAll(kind){
   else if(kind==="money")exportFile("repack-all-money-"+fileTag()+".csv",toCSV([MONEY_HEAD,...weeks.flatMap(x=>moneyRows(x.w,x.label))]));
   else{
     const P=state.settings.partners;
-    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Expected profit","Rate %",...P.flatMap(p=>[p+" spent",p+" half of sold profit",p+" paid",p+" still owed"])];
-    const rows=weeks.map(x=>{const t=calc(x.w);return [x.label,fmtDate(x.w.start),x.w.end?fmtDate(x.w.end):"",t.stockN,t.soldN,t.mv,t.due,t.proceeds,t.spent,t.paid,t.profit,t.rate==null?"":round2(t.rate),...P.flatMap(p=>{const c=pcalc(x.w,p);return [c.spent,c.share,c.paid,c.left]})]});
+    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Expected profit","Rate %",...P.flatMap(p=>[p+" from last week",p+" spent",p+" half of sold profit",p+" paid",p+" owed from sales",p+" if everything sells"])];
+    const rows=weeks.map(x=>{const t=calc(x.w);return [x.label,fmtDate(x.w.start),x.w.end?fmtDate(x.w.end):"",t.stockN,t.soldN,t.mv,t.due,t.proceeds,t.spent,t.paid,t.profit,t.rate==null?"":round2(t.rate),...P.flatMap(p=>{const c=pcalc(x.w,p);return [c.opening,c.spent,c.share,c.paid,c.left,c.ifAll]})]});
     exportFile("repack-weekly-totals-"+fileTag()+".csv",toCSV([head,...rows]));
   }
 }
