@@ -195,6 +195,32 @@ input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:10px;accent-co
 .selbar .btn.sec{background:rgba(255,255,255,.14);color:inherit}
 @media(prefers-color-scheme:dark){.selbar .btn.sec{background:rgba(0,0,0,.12)}}
 .selbtns{display:flex;gap:6px;flex:0 0 auto}
+body.shell{position:fixed;inset:0;overflow:hidden}
+#app.shell{height:100%;display:flex;flex-direction:column;padding-bottom:0}
+#app.shell header{position:relative;flex:0 0 auto;background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+#scroller{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:2px 0 18px}
+#app.shell nav{position:relative;flex:0 0 auto;left:auto;right:auto;bottom:auto}
+#app.shell .selbar{position:relative;left:auto;right:auto;bottom:auto;margin:0 12px 8px;width:auto;flex:0 0 auto;max-width:none}
+.row{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.hr{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.av{display:inline-grid;place-items:center;border-radius:99px;overflow:hidden;color:#fff;font-weight:700;flex:0 0 auto;line-height:1}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.av img:not([src]){visibility:hidden}
+.avatar{padding:0;background:none;width:auto;height:auto}
+.avatar .av{box-shadow:0 0 0 2px var(--acc-soft)}
+.pres{display:flex;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:3px 9px 3px 3px;cursor:pointer;gap:6px}
+.pres .stack{display:flex}
+.pres .stack .av{margin-left:-8px;box-shadow:0 0 0 2px var(--card)}
+.pres .stack .av:first-child{margin-left:0}
+.pres small{font-size:12px;font-weight:600;color:var(--ink2)}
+.livedot{width:8px;height:8px;border-radius:99px;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.2);flex:0 0 auto}
+.hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
+.hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
+.hero .brk span{display:inline;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;opacity:.85}
+.psast{font-size:13px;margin:6px 0 0;color:var(--mute)}
+.psast.ok{color:var(--pos)}.psast.err{color:var(--neg)}
+.bigav{display:flex;align-items:center;gap:14px;margin:6px 0 4px}
+
 .selbar>div:first-child{min-width:0;white-space:nowrap;overflow:hidden}
 .selbar .btn{white-space:nowrap;padding:6px 10px;font-size:13.5px}
 .selbar b{font-size:15px}
@@ -253,11 +279,12 @@ async function fetchAll(table,order){
   return out;
 }
 async function loadAll(){
-  const [st,wk,cd,sp,po,at,au]=await Promise.all([
+  const [st,wk,cd,sp,po,at,au,mb]=await Promise.all([
     sb.from("settings").select("*").eq("id",1).single(),
     sb.from("weeks").select("*").order("start_date",{ascending:true}),
     fetchAll("cards"),fetchAll("spend"),fetchAll("payouts"),fetchAll("attachments","created_at"),
-    sb.from("audit").select("*").order("id",{ascending:false}).limit(300)
+    sb.from("audit").select("*").order("id",{ascending:false}).limit(300),
+    sb.from("members").select("*")
   ]);
   for(const r of [st,wk,au])if(r.error)throw r.error;
   const by=(rows,map)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.week_id))m.set(r.week_id,[]);m.get(r.week_id).push(map(r))});return m};
@@ -267,7 +294,7 @@ async function loadAll(){
   if(!open)throw new Error("No open week found. Re-run setup.sql.");
   const history=wk.data.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
   const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
-  state={attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct},week:mk(open),history,audit:au.data};
+  state={members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct},week:mk(open),history,audit:au.data};
   ui.offline=false;
   try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state}))}catch(e){}
 }
@@ -296,12 +323,15 @@ async function api(p){
 // ---------- realtime ----------
 function subscribe(){
   if(rt||!sb)return;
-  rt=sb.channel("repack-live").on("postgres_changes",{event:"*",schema:"public"},()=>{clearTimeout(rtT);rtT=setTimeout(softRefresh,400)}).subscribe();
+  rt=sb.channel("repack-live",{config:{presence:{key:me.name}}})
+    .on("postgres_changes",{event:"*",schema:"public"},()=>{clearTimeout(rtT);rtT=setTimeout(softRefresh,400)})
+    .on("presence",{event:"sync"},()=>{try{online=rt.presenceState()||{}}catch(e){online={}}paintPresence()})
+    .subscribe(st=>{if(st==="SUBSCRIBED")trackMe(true)});
 }
 function teardown(){
   clearTimeout(rtT);
   if(rt&&sb){try{sb.removeChannel(rt)}catch(e){}}
-  rt=null;me=null;state=null;
+  rt=null;me=null;state=null;online={};lastTrack="";
   try{localStorage.removeItem(CACHE_KEY)}catch(e){}
 }
 
@@ -369,7 +399,22 @@ const weekLabelCurrent=()=>"Current week (started "+fmtDate(state.week.start)+")
 // ---------- toast / modal ----------
 let toastT;
 function toast(msg){document.querySelectorAll(".toast").forEach(x=>x.remove());const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),3200)}
-function modal(html){closeModal();const o=document.createElement("div");o.className="overlay";o.innerHTML='<div class="sheet" role="dialog"><div class="grab"></div>'+html+"</div>";o.addEventListener("mousedown",e=>{if(e.target===o)closeModal()});document.body.appendChild(o);document.body.classList.add("noscroll");return o.firstChild}
+function modal(html){closeModal();const o=document.createElement("div");o.className="overlay";o.innerHTML='<div class="sheet" role="dialog"><div class="grab"></div>'+html+"</div>";o.addEventListener("mousedown",e=>{if(e.target===o)closeModal()});document.body.appendChild(o);swipeClose(o,o.firstChild);document.body.classList.add("noscroll");return o.firstChild}
+function swipeClose(o,sh){
+  let y0=null,x0=0,dy=0,t0=0,drag=false;
+  sh.addEventListener("touchstart",e=>{if(e.touches.length!==1||sh.scrollTop>0||e.target.closest("video,.chips,input[type=range]")){y0=null;return}y0=e.touches[0].clientY;x0=e.touches[0].clientX;t0=Date.now();dy=0;drag=false},{passive:true});
+  sh.addEventListener("touchmove",e=>{
+    if(y0==null)return;const t=e.touches[0],d=t.clientY-y0;
+    if(!drag){if(d>8&&Math.abs(d)>Math.abs(t.clientX-x0)&&sh.scrollTop<=0){drag=true;y0=t.clientY;t0=Date.now();sh.style.transition="none";sh.style.animation="none";const a=document.activeElement;if(a&&a.blur&&sh.contains(a))a.blur()}else if(d<-4||Math.abs(t.clientX-x0)>12){y0=null}return}
+    dy=Math.max(0,t.clientY-y0);e.preventDefault();
+    sh.style.transform="translateY("+dy+"px)";o.style.background="rgba(3,7,18,"+(0.45*(1-Math.min(1,dy/500))).toFixed(3)+")";
+  },{passive:false});
+  const end=()=>{if(y0==null)return;y0=null;if(!drag)return;drag=false;
+    const v=dy/Math.max(1,Date.now()-t0);sh.style.transition="transform .2s ease";
+    if(dy>110||(v>0.5&&dy>30)){sh.style.transform="translateY(110%)";o.style.transition="background .2s";o.style.background="rgba(3,7,18,0)";setTimeout(()=>{if(o.isConnected)closeModal()},190)}
+    else{sh.style.transform="";o.style.background=""}};
+  sh.addEventListener("touchend",end);sh.addEventListener("touchcancel",end);
+}
 function closeModal(){stopCamera();document.querySelectorAll(".overlay").forEach(o=>o.remove());document.body.classList.remove("noscroll");if(ui.dirty){ui.dirty=false;softRefresh()}}
 function busy(form,on){form.querySelectorAll("button").forEach(b=>b.disabled=on)}
 
@@ -447,6 +492,30 @@ const daysIn=c=>{if(!c.date)return null;const d=Math.round((parseISO(todayISO())
 const AVC=["#6366f1","#f97316","#0d9488","#e11d48","#0ea5e9","#a855f7"];
 const avColor=n=>{let h=0;for(const ch of String(n||""))h=(h*31+ch.charCodeAt(0))>>>0;return AVC[h%AVC.length]};
 const plural=(n,w)=>n+" "+w+(n===1?"":"s");
+function memberOf(name){return ((state&&state.members)||[]).find(m=>m.name===name)}
+function avatarHTML(name,size){
+  size=size||32;const m=memberOf(name),st='width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*0.42)+'px;background:'+avColor(name);
+  return '<span class="av" style="'+st+'">'+(m&&m.avatar_path?'<img data-path="'+esc(m.avatar_path)+'" alt="">':esc(String(name||"?").charAt(0).toUpperCase()))+"</span>";
+}
+let online={},lastTrack="",trackT=null;
+const TABN={cards:"Cards",money:"Money",summary:"Summary",history:"History",activity:"Activity"};
+function othersOnline(){const seen=new Map();Object.values(online||{}).flat().forEach(p=>{if(p&&p.name&&(!me||p.name!==me.name)&&(!seen.has(p.name)||(p.at||0)>(seen.get(p.name).at||0)))seen.set(p.name,p)});return [...seen.values()]}
+function presenceHTML(){
+  const l=othersOnline();if(!l.length)return "";
+  return '<button class="pres" data-act="who" aria-label="Who is online"><span class="stack">'+l.slice(0,3).map(p=>avatarHTML(p.name,26)).join("")+'</span><span class="livedot"></span>'+(l.length>3?"<small>+"+(l.length-3)+"</small>":"")+"</button>";
+}
+function paintPresence(){const b=$("#presence");if(b){b.innerHTML=presenceHTML();hydrateThumbs(b)}}
+function trackMe(force){
+  if(!rt||!me||document.hidden)return;
+  const tab=ui.hist?"History":(TABN[ui.tab]||"");
+  if(!force&&tab===lastTrack)return;lastTrack=tab;
+  clearTimeout(trackT);trackT=setTimeout(()=>{try{rt.track({name:me.name,tab,at:Date.now()})}catch(e){}},250);
+}
+function whoModal(){
+  const l=othersOnline();
+  modal('<h2>Online now</h2><div class="menu">'+[{name:me.name,tab:ui.hist?"History":TABN[ui.tab],you:true},...l].map(p=>'<div class="mi" style="cursor:default">'+avatarHTML(p.name,34)+'<div><div style="font-weight:600">'+esc(p.name)+(p.you?" (you)":"")+'</div><div class="hint" style="margin:0">Viewing '+esc(p.tab||"the app")+'</div></div><span class="livedot" style="margin-left:auto"></span></div>').join("")+'</div><p class="hint">Shows who has the app open right now.</p><div class="actions"><button class="btn sec" data-act="close-modal">Close</button></div>');
+  hydrateThumbs(document.querySelector(".sheet"));
+}
 function tile(label,val,sub,cls){return '<div class="tile"><span>'+esc(label)+'</span><b class="'+(cls||"")+'">'+val+"</b>"+(sub?"<small>"+sub+"</small>":"")+"</div>"}
 function emptyBox(icon,text){return '<div class="empty">'+ic(icon,28)+"<p>"+text+"</p></div>"}
 function dueBanner(){
@@ -459,17 +528,22 @@ function dueBanner(){
   return '<div class="banner"><span>A new week has started. Close out the last one and reset?</span><button class="btn sm" data-act="close-week">Close week</button></div>';
 }
 function render(){
+  document.body.classList.remove("shell");$("#app").classList.remove("shell");
   if(!cfg()||!sb){renderSetup();return}
   if(ui.recovery){renderNewPassword();return}
   if(!me){renderLogin();return}
   if(!state){$("#app").innerHTML='<div class="welcome"><p class="hint">Loading...</p></div>';return}
+  const prev=$("#scroller"),top=ui.top?0:(prev?prev.scrollTop:0);ui.top=false;
   let title="Repack Ledger",sub="Week started "+fmtDate(state.week.start)+" | "+me.name,body="",back="";
   if(ui.hist){const h=state.history.find(x=>x.id===ui.hist);if(h){title=h.label;sub=fmtDate(h.start)+" - "+fmtDate(h.end);body=histDetail(h);back='<button class="icon" data-act="back" aria-label="Back">'+ic("back",18)+"</button>"}else ui.hist=null}
   if(!ui.hist){body={cards:cardsView,money:moneyView,summary:summaryView,history:historyView,activity:activityView}[ui.tab]()}
   const tabs=[["cards","Cards"],["money","Money"],["summary","Summary"],["history","History"],["activity","Activity"]];
-  $("#app").innerHTML='<header><div class="hl">'+(back||'<img class="logo" src="icon-192.png" alt="">')+'<div class="ht"><h1>'+esc(title)+"</h1><p>"+esc(sub)+'</p></div></div><button class="avatar" data-act="settings" aria-label="Account and settings">'+esc((me.name||"?").charAt(0).toUpperCase())+"</button></header>"+(ui.offline?'<div class="banner"><span>Offline. Showing the last saved data. Reconnect to make changes.</span></div>':"")+dueBanner()+"<main>"+body+"</main>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
+  document.body.classList.add("shell");$("#app").classList.add("shell");
+  $("#app").innerHTML='<header><div class="hl">'+(back||'<img class="logo" src="icon-192.png" alt="">')+'<div class="ht"><h1>'+esc(title)+"</h1><p>"+esc(sub)+'</p></div></div><div class="hr"><div id="presence">'+presenceHTML()+'</div><button class="avatar" data-act="settings" aria-label="Account and settings">'+avatarHTML(me.name,38)+"</button></div></header>"+
+  '<div id="scroller">'+(ui.offline?'<div class="banner"><span>Offline. Showing the last saved data. Reconnect to make changes.</span></div>':"")+dueBanner()+"<main>"+body+"</main></div>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
   "<nav>"+tabs.map(t=>'<button data-act="tab" data-id="'+t[0]+'" class="'+(!ui.hist&&ui.tab===t[0]||ui.hist&&t[0]==="history"?"on":"")+'"><span class="nb">'+ic(t[0],22)+"</span>"+t[1]+"</button>").join("")+"</nav>";
-  document.querySelectorAll("#cardlist,.hydr").forEach(b=>hydrateThumbs(b));
+  const sc=$("#scroller");if(sc&&top)sc.scrollTop=top;
+  hydrateThumbs($("#app"));trackMe();
 }
 function cardRowHTML(c,edit,view){
   const need=!c.desc||!(+c.mv),n=attachN(c.id),oc=ownerCls(c.owner),dn=daysIn(c);
@@ -513,6 +587,7 @@ function cardsView(){
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
   '<div class="minis"><select class="mini" id="sortsel" aria-label="Sort">'+opt("new","Newest first",ui.sort)+opt("value","Highest value",ui.sort)+opt("low","Lowest value",ui.sort)+opt("name","Name A-Z",ui.sort)+opt("age","Longest in stock",ui.sort)+'</select><select class="mini" id="ownersel" aria-label="Owner">'+opt("","All owners",ui.owner)+opt(P[0],P[0],ui.owner)+opt(P[1],P[1],ui.owner)+opt("Shared","Shared",ui.owner)+"</select></div>"+
+  (ui.filter==="need"&&!ui.sel&&state.week.cards.some(c=>!c.sold&&c.cert&&!c.desc)?'<button class="btn sec block" style="margin-bottom:10px" data-act="psa-fill">'+ic("scan",18)+"Fill missing names from PSA</button>":"")+
   '<div id="cardlist">'+cardListHTML()+"</div>";
 }
 function entryRow(x,kind,act){
@@ -539,7 +614,7 @@ function activityView(){
   list.forEach(a=>{
     const dl=dayLabel(a.ts);if(dl!==last){out+='<div class="dayh">'+esc(dl)+"</div>";last=dl}
     const t=new Date(a.ts).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
-    out+='<div class="row static"><div class="avatar" style="background:'+avColor(a.user_name)+';color:#fff;width:34px;height:34px;font-size:14px;display:grid;place-items:center;align-self:flex-start">'+esc(String(a.user_name||"?").charAt(0))+'</div><div class="main"><div class="desc">'+esc(a.user_name)+" "+esc(ACT_VERB[a.action]||a.action)+(a.entity==="attachments"?" "+esc(a.item):(a.entity!=="settings"?" "+esc(ACT_ENT[a.entity]||a.entity):" settings")+(a.item&&a.entity!=="settings"?": "+esc(a.item):""))+'</div><div class="sub">'+esc(t)+(a.detail?" | "+esc(prettyDetail(a.detail)):"")+"</div></div></div>";
+    out+='<div class="row static">'+avatarHTML(a.user_name,34)+'<div class="main"><div class="desc">'+esc(a.user_name)+" "+esc(ACT_VERB[a.action]||a.action)+(a.entity==="attachments"?" "+esc(a.item):(a.entity!=="settings"?" "+esc(ACT_ENT[a.entity]||a.entity):" settings")+(a.item&&a.entity!=="settings"?": "+esc(a.item):""))+'</div><div class="sub">'+esc(t)+(a.detail?" | "+esc(prettyDetail(a.detail)):"")+"</div></div></div>";
   });
   return '<div class="sech"><h3>Who did what</h3><button class="btn sm sec" data-act="exp-audit">'+ic("download",16)+'Export CSV</button></div><div class="chips"><button class="chip '+(!ui.actUser?"on":"")+'" data-act="act-user" data-id="">Everyone</button>'+names.map(n=>'<button class="chip '+(ui.actUser===n?"on":"")+'" data-act="act-user" data-id="'+esc(n)+'">'+esc(n)+"</button>").join("")+"</div>"+
   (list.length?out+(list.length>=200?'<p class="hint">Showing the latest 200. Export CSV for everything.</p>':""):emptyBox("activity","No activity yet."));
@@ -553,7 +628,7 @@ function moneyView(){
   '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+ledgerList(w.payouts,"payouts");
 }
 function tilesFor(t){
-  return '<div class="hero"><span>Profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><small>payout due + cash in - spent</small></div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock")+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
+  return '<div class="hero"><span>Profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Payout due '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+"</span></div>"+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock")+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
   return "<table><tr><th>Partner</th><th>Spent</th><th>Paid</th><th>Left</th></tr>"+state.settings.partners.map(p=>{const c=pcalc(w,p);return "<tr><td>"+esc(p)+"</td><td>"+money(c.spent)+"</td><td>"+money(c.paid)+'</td><td class="'+(c.left<0?"neg":"")+'">'+money(c.left)+"</td></tr>"}).join("")+"</table>";
@@ -592,7 +667,7 @@ function weekMenu(id){
   const h=state.history.find(x=>x.id===id);if(!h)return;
   const el=modal("<h2>"+esc(h.label)+'</h2><p class="hint">'+fmtDate(h.start)+" - "+fmtDate(h.end)+" | "+plural(h.cards.length,"card")+'</p><div class="menu"><button class="mi" data-m="open">'+ic("open")+'Open week</button><button class="mi" data-m="full">'+ic("download")+'Download full week CSV</button><button class="mi" data-m="rename">'+ic("edit")+'Rename week</button><button class="mi dz" data-m="del">'+ic("trash")+'Delete week</button></div><div class="actions"><button class="btn sec" data-act="close-modal">Cancel</button></div>');
   el.addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(!b)return;const m=b.dataset.m;
-    if(m==="open"){closeModal();ui.hist=id;render();window.scrollTo(0,0)}
+    if(m==="open"){closeModal();ui.hist=id;ui.top=true;render()}
     else if(m==="full")doExport("full",id);
     else if(m==="rename")renameWeekModal(id);
     else if(m==="del")deleteWeekModal(id);
@@ -641,6 +716,7 @@ function normalizeCert(raw){
   const s=String(raw||"").trim();
   let m=s.match(/cert\/(\d{5,10})/i);if(m)return m[1];
   m=s.match(/^\D*(\d{6,10})\D*$/);if(m)return m[1];
+  const t=s.replace(/[\s-]/g,"");if(/^\d{5,10}$/.test(t))return t;
   return s;
 }
 function beep(ok){
@@ -683,18 +759,23 @@ function scanModal(){
   const el=modal('<h2>Scan certs</h2><p class="hint">Scan with a barcode scanner (it types the number and presses Enter), tap Use camera, or type a cert and press Enter. Each cert is saved for everyone right away; fill in details later.</p>'+
     '<div class="two"><div>'+field("Owner",'<select id="scown">'+["Shared",...state.settings.partners].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" value="'+state.settings.defaultPct+'">')+"</div></div>"+
     field("Cert number",'<div class="certrow"><input id="scin" class="scanin" inputmode="numeric" autocomplete="off" placeholder="Scan or type, then Enter"><button class="btn" id="scadd" type="button">Add</button></div>')+
-    '<video id="scv" class="video" playsinline muted hidden></video><div class="actions"><button class="btn sec" id="sccam" type="button">Use camera</button><button class="btn" data-act="close-modal" type="button">Done</button></div><div class="sec"><h3 id="sccount"></h3></div><div id="sclist"></div>');
+    '<label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and slab photos</label>'+
+    '<video id="scv" class="video" playsinline muted hidden></video><div class="actions"><button class="btn sec" id="sccam" type="button">Use camera</button><button class="btn" data-act="close-modal" type="button">Done</button></div><div class="sech"><h3 id="sccount"></h3></div><div id="sclist"></div>');
   const inp=$("#scin",el),vid=$("#scv",el);
-  const paint=()=>{$("#sccount",el).textContent=added.length?added.length+" added this session":"";$("#sclist",el).innerHTML=added.slice(0,10).map(c=>'<div class="row static"><div class="main"><div class="desc">'+esc(c)+'</div></div><div class="amt"><span class="badge ok">Saved</span></div></div>').join("")};
+  const info={};let chain=Promise.resolve();
+  const paint=()=>{$("#sccount",el).textContent=added.length?added.length+" added this session":"";$("#sclist",el).innerHTML=added.slice(0,10).map(c=>{const x=info[c]||{};return '<div class="row static"><div class="main"><div class="desc">'+esc(x.title||c)+'</div>'+(x.title?'<div class="sub">Cert '+esc(c)+"</div>":"")+'</div><div class="amt"><span class="badge '+(x.st==="err"?"":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+"</span></div></div>"}).join("")};
+  $("#scpsa",el).addEventListener("change",e=>{try{localStorage.setItem("repack-psa-auto",e.target.checked?"1":"0")}catch(x){}});
+  const enrich=(id,cert)=>{info[cert]={st:"busy"};paint();chain=chain.then(async()=>{const r=await psaLookup(cert,true);if(r.error){info[cert]={st:"err"};if(r.setup){$("#scpsa",el).checked=false;toast(r.error)}}else{await psaAttach(id,r,true);info[cert]={st:"ok",title:r.title}}ui.dirty=true;if(el.isConnected)paint()})};
   const pending=new Set();
   const add=async raw=>{
     const cert=normalizeCert(raw);if(!cert||pending.has(cert))return;
     if(added.includes(cert)||state.week.cards.some(c=>c.cert===cert)){toast("Already in this week: "+cert);beep(false);return}
     pending.add(cert);
-    const r=await api(sb.from("cards").insert(newCardRow({cert,owner:$("#scown",el).value,pct:+$("#scpct",el).value||state.settings.defaultPct})));
+    const r=await api(sb.from("cards").insert(newCardRow({cert,owner:$("#scown",el).value,pct:+$("#scpct",el).value||state.settings.defaultPct})).select("id").single());
     pending.delete(cert);
     if(!r){beep(false);return}
     added.unshift(cert);ui.dirty=true;beep(true);paint();
+    if($("#scpsa",el).checked&&r.data&&r.data.id)enrich(r.data.id,cert);
   };
   const submit=()=>{const v=inp.value;inp.value="";add(v);inp.focus()};
   inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&inp.value.trim()){e.preventDefault();submit()}});
@@ -706,6 +787,90 @@ function scanModal(){
     if(ok)$("#sccam",el).textContent="Stop camera";else vid.hidden=true;
   });
   paint();inp.focus();
+}
+
+// ---------- profile photos ----------
+async function squareAvatar(file){
+  try{
+    const bmp=window.createImageBitmap?await createImageBitmap(file):await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)});
+    const w0=bmp.width||bmp.naturalWidth,h0=bmp.height||bmp.naturalHeight,s0=Math.min(w0,h0);
+    const cv=document.createElement("canvas");cv.width=cv.height=400;
+    cv.getContext("2d").drawImage(bmp,(w0-s0)/2,(h0-s0)/2,s0,s0,0,0,400,400);
+    return await new Promise(res=>cv.toBlob(res,"image/jpeg",0.85));
+  }catch(e){return null}
+}
+async function setAvatar(file){
+  let path=null;
+  if(file){
+    const b=await squareAvatar(file);if(!b){toast("Could not read that photo. Try a different one.");return}
+    path="avatars/"+uid()+".jpg";
+    if(!await api(sb.storage.from("receipts").upload(path,b,{contentType:"image/jpeg"})))return;
+  }
+  const r=await sb.rpc("set_my_avatar",{p_path:path}).catch(e=>({error:e}));
+  if(r.error){if(path)removeFiles([path]);const m=String(r.error.message||"");toast(r.error.code==="PGRST202"||/set_my_avatar/.test(m)?"Run upgrade-3.sql in Supabase first, then try again":errText(r.error));return}
+  if(r.data)removeFiles([r.data]);
+  closeModal();await refreshRender();toast(file?"Profile photo updated":"Profile photo removed");
+}
+
+// ---------- PSA lookup ----------
+const PSA_UP=new Set(["GX","EX","V","VMAX","VSTAR","IR","SIR","SAR","AR","UR","HR","CHR","TG","GG","PSA","SV","SWSH","XY","SM","BW","DX","CS","CBB","JP","EN","PR","LV.X","TAG","TEAM","BREAK","PRIME","MEGA"].map(x=>x.toUpperCase()));
+function psaCase(str){
+  return String(str||"").trim().split(/\s+/).map(w=>w.split("-").map(p=>{
+    if(!p)return p;if(/\d/.test(p))return p;if(p===p.toLowerCase())return p;
+    if(PSA_UP.has(p.toUpperCase())&&p.toUpperCase()!=="MEGA")return p.toUpperCase();return p.charAt(0).toUpperCase()+p.slice(1).toLowerCase();
+  }).join("-")).join(" ");
+}
+function psaTitle(i){
+  if(!i)return "";
+  const gr=String(i.CardGrade||i.GradeDescription||"").trim(),m=gr.match(/(\d+(?:\.\d)?)\s*$/);
+  const g=m?"PSA "+m[1]:(gr?"PSA "+psaCase(gr):"");
+  const brand=psaCase(i.Brand),subj=psaCase(i.Subject),vari=psaCase(i.Variety);
+  return [i.Year,brand,subj,vari,i.CardNumber?"#"+String(i.CardNumber).replace(/^#/,""):"",g].map(x=>String(x||"").trim()).filter(Boolean).join(" ");
+}
+function b64Blob(b64,type){const bin=atob(b64),u=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);return new Blob([u],{type:type||"image/jpeg"})}
+async function psaLookup(cert,images){
+  let r;
+  try{r=await sb.functions.invoke("psa-lookup",{body:{cert,images:images!==false}})}catch(e){return{error:errText(e)}}
+  if(r&&r.error){
+    const st=r.error.context&&r.error.context.status,m=String(r.error.message||"");
+    if(st===404||/Failed to send|not found|FunctionsFetchError|FunctionsRelayError/i.test(m+" "+(r.error.name||"")))return{error:"PSA lookup is not set up yet. See the PSA section in SETUP.md.",setup:true};
+    return{error:m||"PSA lookup failed"};
+  }
+  const d=(r&&r.data)||{};if(typeof d==="string"){try{return psaParse(JSON.parse(d))}catch(e){return{error:"PSA lookup failed"}}}
+  return psaParse(d);
+}
+function psaParse(d){
+  if(d.error)return{error:String(d.error)};
+  if(!d.info)return{error:"PSA had no data for that cert"};
+  const blobs=[];(d.images||[]).forEach(im=>{try{if(im&&im.data)blobs.push(b64Blob(im.data,im.type))}catch(e){}});
+  return{info:d.info,title:psaTitle(d.info),blobs,pop:d.info.TotalPopulation};
+}
+async function psaAttach(cardId,res,setDesc){
+  if(setDesc&&res.title)await api(sb.from("cards").update({description:res.title}).eq("id",cardId));
+  if(res.blobs.length&&!attachN(cardId)){
+    const out=[];for(const b of res.blobs){const c=await compressImage(b,true);out.push(c||b)}
+    await uploadPhotos("cards",cardId,out);
+  }
+}
+function psaAutoOn(){try{return localStorage.getItem("repack-psa-auto")!=="0"}catch(e){return true}}
+function psaFillModal(){
+  const todo=state.week.cards.filter(c=>!c.sold&&c.cert&&!c.desc).slice(0,45);
+  if(!todo.length){toast("No cards without a description");return}
+  let stop=false,done=0,fail=0;
+  const el=modal('<h2>Fill from PSA</h2><p class="hint">Looks up '+todo.length+' cert'+(todo.length>1?"s":"")+' with no description and adds the PSA name, grade and slab photos. Your free PSA plan allows about 50 lookups a day.</p><div class="preview" id="pfst">Starting...</div><div class="prog" style="margin-top:12px"><i id="pfbar" style="width:0%"></i></div><div class="actions"><button class="btn sec" id="pfstop" type="button">Stop</button></div>');
+  $("#pfstop",el).addEventListener("click",()=>{stop=true;closeModal()});
+  (async()=>{
+    for(const c of todo){
+      if(stop)break;
+      const r=await psaLookup(c.cert,true);
+      if(r.error){fail++;if(r.setup||/limit|quota|429/i.test(r.error)){$("#pfst",el).textContent=r.error;break}}
+      else{await psaAttach(c.id,r,true);done++}
+      if(stop)break;
+      $("#pfst",el).textContent=done+" filled"+(fail?" | "+fail+" not found":"")+" | "+(todo.length-done-fail)+" left";
+      $("#pfbar",el).style.width=Math.round((done+fail)/todo.length*100)+"%";
+    }
+    if(!stop){$("#pfstop",el).textContent="Done";ui.dirty=true}
+  })();
 }
 
 // ---------- photos ----------
@@ -726,7 +891,7 @@ async function hydrateThumbs(box){
   let urls;try{urls=await signedUrls(imgs.map(i=>i.dataset.path))}catch(e){return}
   imgs.forEach((im,i)=>{if(urls[i])im.src=urls[i]});
 }
-async function compressImage(file){
+async function compressImage(file,quiet){
   try{
     const bmp=window.createImageBitmap?await createImageBitmap(file):await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)});
     const w0=bmp.width||bmp.naturalWidth,h0=bmp.height||bmp.naturalHeight,k=Math.min(1,1600/Math.max(w0,h0));
@@ -735,7 +900,7 @@ async function compressImage(file){
     const blob=await new Promise(res=>cv.toBlob(res,"image/jpeg",0.82));
     if(!blob)throw new Error("blob");
     return blob;
-  }catch(e){toast("Could not read that photo. Try a different one.");return null}
+  }catch(e){if(!quiet)toast("Could not read that photo. Try a different one.");return null}
 }
 async function uploadPhotos(kind,entityId,blobs){
   let ok=0;
@@ -772,7 +937,7 @@ function photoWidget(el,kind,entityId){
     if(t.dataset.pend!==undefined){const [p]=pending.splice(+t.dataset.pend,1);try{URL.revokeObjectURL(p.url)}catch(x){}paint();return}
     const a=attachList(entityId).find(x=>x.id===t.dataset.aid);if(a)openLightbox(a,true,paint);
   });
-  const add=async files=>{for(const f of files){const b=await compressImage(f);if(b)pending.push({blob:b,url:URL.createObjectURL(b)})}paint()};
+  const add=async(files,quiet)=>{for(const f of files){const b=(await compressImage(f,quiet))||(quiet?f:null);if(b)pending.push({blob:b,url:URL.createObjectURL(b)})}paint()};
   const fc=$("#ph-cam",el),fp=$("#ph-file",el);
   $("#ph-camb",el).addEventListener("click",()=>{fc.value="";fc.click()});
   $("#ph-pickb",el).addEventListener("click",()=>{fp.value="";fp.click()});
@@ -800,7 +965,7 @@ function cardModal(id,carry){
   const recvHTML=dsp==="traded"&&c?'<p class="hint">'+(recv.length?"Received in this trade: "+recv.map(x=>esc(x.desc||("cert "+x.cert))).join(", "):"No received cards added yet.")+'</p><button type="button" class="btn sec sm" id="addrecv">Add received card</button>':'<p class="hint" id="recvhint">'+(c?"":"Save this card first, then add the cards you received.")+'</p><button type="button" class="btn sec sm" id="addrecv" style="display:'+(c?"inline-block":"none")+'">Add received card</button>';
   const sel=v=>dsp===v?" selected":"";
   const el=modal("<h2>"+(c?"Edit card":"Add card")+'</h2>'+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
-    field("PSA cert # (type, use a scanner, or tap Scan)",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button></div><video id="cv" class="video" playsinline muted hidden></video>')+
+    field("PSA cert # (type, use a scanner, or tap Scan)",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button><button type="button" class="btn sec" id="psab">PSA</button></div><video id="cv" class="video" playsinline muted hidden></video><div class="psast" id="psast"></div>')+
     field("Date purchased",'<input type="date" name="date" value="'+esc(d.date)+'">')+
     field("Description",'<input name="desc" placeholder="2023 Charizard ex PSA 10" value="'+esc(d.desc)+'">')+
     '<div class="two"><div>'+field("Owner",'<select name="owner">'+owners.map(o=>"<option"+(o===d.owner?" selected":"")+">"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+esc(d.pct)+'">')+"</div></div>"+
@@ -820,6 +985,17 @@ function cardModal(id,carry){
   const ph=photoWidget(el,"cards",id);
   f.cert.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&f.cert.value.trim()){e.preventDefault();f.cert.value=normalizeCert(f.cert.value);f.desc.focus()}});
   f.cert.addEventListener("change",()=>{f.cert.value=normalizeCert(f.cert.value)});
+  $("#psab",el).addEventListener("click",async()=>{
+    const f2=$("#cf",el),cert=normalizeCert(f2.cert.value),st=$("#psast",el);
+    if(!cert){toast("Enter or scan a cert number first");return}
+    f2.cert.value=cert;st.className="psast";st.textContent="Looking up PSA cert "+cert+"...";$("#psab",el).disabled=true;
+    const r=await psaLookup(cert,true);$("#psab",el).disabled=false;
+    if(r.error){st.className="psast err";st.textContent=r.error;return}
+    const cur=f2.desc.value.trim();
+    if(r.title&&(!cur||cur===r.title||confirm("Replace the description with PSA's?\n\n"+r.title)))f2.desc.value=r.title;
+    let n=0;if(r.blobs.length&&!(c&&attachN(c.id))){await ph.add(r.blobs,true);n=r.blobs.length}
+    st.className="psast ok";st.textContent="Found: "+r.title+(r.pop?" | Pop "+r.pop:"")+(n?" | "+n+" PSA photo"+(n>1?"s":"")+" added, saved when you tap Save":"");
+  });
   $("#certcam",el).addEventListener("click",async()=>{
     const v=$("#cv",el);
     if(!v.hidden){stopCamera();v.hidden=true;return}
@@ -933,7 +1109,7 @@ function entryModal(kind,id){
 }
 function selBar(){
   const cs=state.week.cards.filter(c=>ui.sel.has(c.id)&&!c.sold);
-  return '<div style="height:64px"></div><div class="selbar"><div><b>'+cs.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sec sm" data-act="sel-all">Select all</button><button class="btn sm" data-act="sel-sell"'+(cs.length?"":" disabled")+'>Sell at %</button><button class="btn sec sm" data-act="sel-cancel">Cancel</button></div></div>';
+  return '<div class="selbar"><div><b>'+cs.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sec sm" data-act="sel-all">Select all</button><button class="btn sm" data-act="sel-sell"'+(cs.length?"":" disabled")+'>Sell at %</button><button class="btn sec sm" data-act="sel-cancel">Cancel</button></div></div>';
 }
 function bulkSellModal(){
   const P=state.settings.partners;
@@ -989,18 +1165,29 @@ function bulkSellModal(){
 function closeWeekModal(){
   const w=state.week,label="Week of "+fmtDate(w.start)+" - "+fmtDate(todayISO());
   const t=calc(w);
-  const el=modal('<h2>Close this week</h2><p class="hint">Saves '+w.cards.length+" cards, "+w.spend.length+" spend and "+w.payouts.length+" payout entries to History for everyone (spent "+money(t.spent)+"), then resets.</p><form id=\"wf\">"+field("Name",'<input name="label" value="'+esc(label)+'">')+'<label class="chk"><input type="checkbox" name="carry">Carry over unsold cards to the new week</label><div class="actions"><button class="btn" type="submit">Close week</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
-  $("#wf",el).addEventListener("submit",async e=>{
-    e.preventDefault();const f=e.target;busy(f,true);
-    const r=await api(sb.rpc("close_week",{p_label:f.label.value.trim()||label,p_carry:f.carry.checked}));
-    if(!r){busy(f,false);return}
-    closeModal();ui.tab="history";await refreshRender();toast("Week saved to History");
+  const el=modal('<h2>Close this week</h2><p class="hint">Saves '+w.cards.length+" cards, "+w.spend.length+" spend and "+w.payouts.length+" payout entries to History for everyone (spent "+money(t.spent)+"), then resets.</p><form id=\"wf\">"+field("Name",'<input name="label" value="'+esc(label)+'">')+'<label class="chk"><input type="checkbox" name="carry">Carry over unsold cards to the new week</label><div class="actions"><button class="btn" type="submit">Continue</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
+  $("#wf",el).addEventListener("submit",e=>{
+    e.preventDefault();const f=e.target,name=f.label.value.trim()||label,carry=f.carry.checked,keep=w.cards.filter(c=>!c.sold).length;
+    el.innerHTML='<div class="grab"></div><div class="dzic" style="background:var(--warn);color:var(--warn-ink)">'+ic("history",26)+'</div><h2 class="center">Close the week for everyone?</h2><p class="hint center"><b>'+esc(name)+'</b> moves to History and a fresh week starts on every phone.</p><div class="counts"><div><b>'+w.cards.length+'</b><span>cards</span></div><div><b>'+(w.spend.length+w.payouts.length)+'</b><span>money entries</span></div><div><b>'+money(t.profit)+'</b><span>profit</span></div></div><p class="hint center">'+(carry?keep+" unsold "+(keep===1?"card carries":"cards carry")+" over to the new week.":"Nothing carries over. The new week starts empty.")+'</p><div class="actions"><button class="btn" id="cwyes" type="button">Yes, close week</button><button class="btn sec" id="cwback" type="button">Go back</button></div>';
+    $("#cwback",el).addEventListener("click",()=>closeWeekModal());
+    $("#cwyes",el).addEventListener("click",async e2=>{
+      el.querySelectorAll("button").forEach(b=>b.disabled=true);
+      const r=await api(sb.rpc("close_week",{p_label:name,p_carry:carry}));
+      if(!r){el.querySelectorAll("button").forEach(b=>b.disabled=false);return}
+      closeModal();ui.tab="history";ui.top=true;await refreshRender();toast("Week saved to History");
+    });
   });
 }
 function settingsModal(){
   const s=state.settings;
-  const el=modal('<h2>Account</h2><p class="hint">Signed in as <b>'+esc(me.name)+"</b> | "+esc(me.email)+'</p><div class="toolbar"><button class="btn sec" data-act="change-pw">Change password</button><button class="btn sec" data-act="sign-out">Sign out</button></div><h2 style="margin-top:22px">Settings</h2><form id="sf"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>"<option value=\""+i+"\""+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div><div class="actions"><button class="btn" type="submit">Save settings</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>'+
+  const myM=memberOf(me.name),hasAv=!!(myM&&myM.avatar_path);
+  const el=modal('<h2>Account</h2><div class="bigav">'+avatarHTML(me.name,64)+'<div><div style="font-weight:700;font-size:17px">'+esc(me.name)+'</div><div class="hint" style="margin:2px 0 8px">'+esc(me.email)+'</div><div style="display:flex;gap:6px"><button class="btn sec sm" id="avch" type="button">'+(hasAv?"Change photo":"Add photo")+"</button>"+(hasAv?'<button class="btn sec sm" id="avrm" type="button">Remove</button>':"")+'</div></div><input type="file" id="avin" accept="image/*" hidden></div><div class="toolbar"><button class="btn sec" data-act="change-pw">Change password</button><button class="btn sec" data-act="sign-out">Sign out</button></div><h2 style="margin-top:22px">Settings</h2><form id="sf"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>"<option value=\""+i+"\""+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div><div class="actions"><button class="btn" type="submit">Save settings</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>'+
   '<h2 style="margin-top:22px">Backup</h2><p class="hint">Data lives in your shared database. This downloads a copy of everything as a file.</p><div class="toolbar"><button class="btn sec" data-act="backup">Export backup</button></div>');
+  hydrateThumbs(el);
+  const avin=$("#avin",el);
+  $("#avch",el).addEventListener("click",()=>{avin.value="";avin.click()});
+  avin.addEventListener("change",()=>{if(avin.files[0])setAvatar(avin.files[0])});
+  if($("#avrm",el))$("#avrm",el).addEventListener("click",()=>setAvatar(null));
   $("#sf",el).addEventListener("submit",async e=>{
     e.preventDefault();const f=e.target;const n0=f.p0.value.trim(),n1=f.p1.value.trim();
     if(!n0||!n1||n0.toLowerCase()===n1.toLowerCase()||/^shared$/i.test(n0)||/^shared$/i.test(n1)){toast("Partner names must be different and not Shared");return}
@@ -1122,12 +1309,14 @@ function backup(){exportFile("repack-backup-"+fileTag()+".json",JSON.stringify({
 
 // ---------- actions ----------
 const actions={
-  tab(id){ui.tab=id;ui.hist=null;ui.sel=null;render();window.scrollTo(0,0)},
+  tab(id){ui.tab=id;ui.hist=null;ui.sel=null;ui.top=true;render()},
   "sel-mode"(){ui.sel=new Set();ui.filter="stock";render()},
   "sel-cancel"(){ui.sel=null;render()},
   "toggle-sel"(id){const c=state.week.cards.find(x=>x.id===id);if(!c||c.sold||!ui.sel)return;if(ui.sel.has(id))ui.sel.delete(id);else ui.sel.add(id);render()},
   "sel-all"(){filteredCards().filter(c=>!c.sold).forEach(c=>ui.sel.add(c.id));render()},
   "sel-sell"(){bulkSellModal()},
+  who(){whoModal()},
+  "psa-fill"(){psaFillModal()},
   back(){ui.hist=null;render()},
   filter(id){ui.filter=id;render()},
   "add-card"(){cardModal(null)},
@@ -1141,7 +1330,7 @@ const actions={
   "close-week"(){closeWeekModal()},
   settings(){settingsModal()},
   "close-modal"(){closeModal()},
-  "open-hist"(id){ui.hist=id;render();window.scrollTo(0,0)},
+  "open-hist"(id){ui.hist=id;ui.top=true;render()},
   "del-hist"(id){deleteWeekModal(id)},
   "week-menu"(id){weekMenu(id)},
   "rename-week"(id){renameWeekModal(id)},
@@ -1159,11 +1348,27 @@ const actions={
     if(r)toast("If that email is on the list, a reset link is on its way");
   }
 };
-document.addEventListener("click",e=>{const t=e.target.closest("[data-act]");if(!t)return;const fn=actions[t.dataset.act];if(fn){e.preventDefault();fn(t.dataset.id,t,e)}});
+let lp=null,lpSuppress=false;
+document.addEventListener("pointerdown",e=>{
+  if(e.pointerType==="mouse"&&e.button!==0)return;
+  const r=e.target.closest('[data-act="edit-card"]');if(!r||ui.sel||ui.hist)return;
+  clearTimeout(lp&&lp.t);
+  lp={id:r.dataset.id,x:e.clientX,y:e.clientY,t:setTimeout(()=>{const id=lp&&lp.id;lp=null;if(id)startQuickSelect(id)},450)};
+});
+document.addEventListener("pointermove",e=>{if(lp&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>10){clearTimeout(lp.t);lp=null}});
+["pointerup","pointercancel","scroll"].forEach(n=>document.addEventListener(n,()=>{if(lp){clearTimeout(lp.t);lp=null}},true));
+document.addEventListener("contextmenu",e=>{if(e.target.closest(".row"))e.preventDefault()});
+function startQuickSelect(id){
+  const c=state&&state.week.cards.find(x=>x.id===id);if(!c)return;
+  ui.sel=new Set(c.sold?[]:[id]);lpSuppress=true;setTimeout(()=>{lpSuppress=false},900);
+  try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}
+  render();if(c.sold)toast("Sold cards cannot be selected. Pick in-stock cards.");
+}
+document.addEventListener("click",e=>{if(lpSuppress&&e.target.closest("[data-act]")){lpSuppress=false;e.preventDefault();return}const t=e.target.closest("[data-act]");if(!t)return;const fn=actions[t.dataset.act];if(fn){e.preventDefault();fn(t.dataset.id,t,e)}});
 document.addEventListener("input",e=>{if(e.target.id==="q"){ui.q=e.target.value;paintList()}});
 document.addEventListener("change",e=>{const id=e.target.id;if(id==="sortsel"){ui.sort=e.target.value;try{localStorage.setItem("repack-ui",JSON.stringify({sort:ui.sort}))}catch(x){}render()}else if(id==="ownersel"){ui.owner=e.target.value;render()}});
 $("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importCSVText(String(r.result));r.readAsText(f)});
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&sb&&me)softRefresh()});
+document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document.hidden){try{rt&&rt.untrack()}catch(e){}lastTrack=""}else{softRefresh();trackMe(true)}});
 window.addEventListener("online",()=>{if(sb&&me)softRefresh()});
 
 // ---------- boot ----------
