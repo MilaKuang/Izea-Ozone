@@ -298,6 +298,10 @@ body.shell .toast{position:absolute}
 .cwrow .sub{font-size:12px;color:var(--mute)}
 .pbrk{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin-top:8px;font-size:12px;color:var(--mute)}
 .pbrk span:nth-child(even){text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums}
+.mftot{font-size:12px;color:var(--mute);text-align:right;margin:-2px 4px 8px}
+html.kbopen .overlay:not(.fullscan){top:var(--vvt);bottom:auto;height:var(--vvh)}
+html.kbopen .overlay:not(.fullscan) .sheet{max-height:calc(var(--vvh) - 10px);padding-bottom:14px}
+html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-bottom:10px}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -365,8 +369,8 @@ function cfg(){
 
 // ---------- row mapping ----------
 const num=v=>v==null?"":+v;
-const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repacker:r.repacker||(r.repack_status||r.notes==="Pending Triumph approval"?"Triumph":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
-const mapEntry=r=>({id:r.id,partner:r.partner,amount:+r.amount,date:r.entry_date||"",note:r.note||"",cardId:r.card_id,createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
+const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,carried:!!r.carried,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repacker:r.repacker||(r.repack_status||r.notes==="Pending Triumph approval"?"Triumph":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
+const mapEntry=r=>({id:r.id,partner:r.partner,amount:+r.amount,kind:r.kind||"buy",to:r.to_partner||"",date:r.entry_date||"",note:r.note||"",cardId:r.card_id,createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
 const cardRow=r=>{const o=cardRow0(r);if(state&&state.hasRepack){o.repack_status=r.repack||null;o.repack_date=r.repack?(r.repackDate||todayISO()):null}if(state&&state.hasRepacker)o.repacker=r.repack?(r.repacker||state.settings.repackers[0]):null;return o};
 const cardRow0=r=>({date_purchased:r.date||null,cert:r.cert||null,description:r.desc||"",owner:r.owner,market_value:r.mv===""?null:+r.mv,consignor_pct:+r.pct,sold:!!r.sold,sale_type:r.sold?(r.saleType||"sold"):null,sold_price:(r.soldPrice===""||r.soldPrice==null)?null:+r.soldPrice,sold_date:r.soldDate||null,trade_cash:(r.sold&&r.saleType==="traded"&&r.tradeCash!==""&&r.tradeCash!=null)?+r.tradeCash:null,notes:r.notes||""});
 
@@ -382,14 +386,15 @@ async function fetchAll(table,order){
   return out;
 }
 async function loadAll(){
-  const [st,wk,cd,sp,po,at,au,mb,rp,rq]=await Promise.all([
+  const [st,wk,cd,sp,po,at,au,mb,rp,rq,lq]=await Promise.all([
     sb.from("settings").select("*").eq("id",1).single(),
     sb.from("weeks").select("*").order("start_date",{ascending:true}),
     fetchAll("cards"),fetchAll("spend"),fetchAll("payouts"),fetchAll("attachments","created_at"),
     sb.from("audit").select("*").order("id",{ascending:false}).limit(300),
     sb.from("members").select("*"),
     sb.from("cards").select("repack_status").limit(1),
-    sb.from("cards").select("repacker").limit(1)
+    sb.from("cards").select("repacker").limit(1),
+    sb.from("spend").select("kind").limit(1)
   ]);
   for(const r of [st,wk,au])if(r.error)throw r.error;
   const by=(rows,map)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.week_id))m.set(r.week_id,[]);m.get(r.week_id).push(map(r))});return m};
@@ -399,7 +404,7 @@ async function loadAll(){
   if(!open)throw new Error("No open week found. Re-run setup.sql.");
   const history=wk.data.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
   const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
-  state={hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
+  state={hasLoan:!!(lq&&!lq.error),hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
   ui.offline=false;
   try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state}))}catch(e){}
 }
@@ -426,7 +431,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=22;
+const APP_VERSION=23;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -467,17 +472,18 @@ function teardown(){
 const payoutOf=c=>Math.round((+c.mv||0)*(+c.pct||0))/100;
 const cashIn=c=>c.saleType==="traded"?(+c.tradeCash||0):(+c.soldPrice||0);
 function calc(w){
-  const stock=w.cards.filter(c=>!c.sold),sold=w.cards.filter(c=>c.sold);
+  const stock=w.cards.filter(c=>!c.sold&&!c.carried),sold=w.cards.filter(c=>c.sold),carriedN=w.cards.filter(c=>!c.sold&&c.carried).length;
   const mv=sum(stock,c=>c.mv),due=sum(stock,payoutOf),proceeds=sum(sold,cashIn);
-  const spent=sum(w.spend,x=>x.amount),paid=sum(w.payouts,x=>x.amount);
+  const spent=sum(w.spend.filter(x=>x.kind!=="loan"),x=>x.amount),paid=sum(w.payouts,x=>x.amount);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),ssp=sum(so,c=>c.soldPrice);
   const acc=stock.filter(c=>c.repack==="accepted"),pend=stock.filter(c=>c.repack==="pending"),accBy={};
   acc.forEach(c=>{const n=c.repacker||"Repacker";accBy[n]=round2((accBy[n]||0)+payoutOf(c))});
-  return{accBy,accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
+  return{carriedN,accBy,accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
 }
 // each partner gets back what they spent plus an equal share of the profit; payouts already made come off that
 function pcalc(w,p){
-  const spent=sum(w.spend.filter(x=>x.partner===p),x=>x.amount);
+  // a loan between partners moves money from one to the other without counting as spend
+  const spent=round2(sum(w.spend.filter(x=>x.partner===p),x=>x.amount)-sum(w.spend.filter(x=>x.kind==="loan"&&x.to===p),x=>x.amount));
   const paid=sum(w.payouts.filter(x=>x.partner===p),x=>x.amount);
   const share=round2(calc(w).profit/Math.max(1,state.settings.partners.length));
   return{spent,paid,share,owed:round2(spent+share),left:round2(spent+share-paid)};
@@ -518,7 +524,7 @@ const stampCols=o=>[o.createdBy||"",o.createdAt?fmtTime(o.createdAt):"",o.update
 const CARD_HEAD=["Week","Date Purchased","PSA Cert #","Item Description","Owner","Market Value","Consignor %","Consignor Payout","Status","Repacker","Repacker Status","Sold Price / Trade Value","Cash Received","% of Market","Received In Trade For (Cert)","Sold Date","Notes","Photos","Added By","Added At","Last Edited By","Last Edited At"];
 const cardRows=(w,label)=>{const byId=new Map(w.cards.map(c=>[c.id,c]));return w.cards.map(c=>{const st=c.sold?(c.saleType==="traded"?"Traded":"Sold"):"In stock";const from=c.fromCardId&&byId.get(c.fromCardId);return [label,fmtDate(c.date),c.cert,c.desc,c.owner,round2(+c.mv||0),+c.pct||0,round2(payoutOf(c)),st,c.repack?c.repacker:"",c.repack?({pending:"Pending",accepted:"Accepted",rejected:"Rejected"})[c.repack]:"",c.sold?round2(+c.soldPrice||0):"",c.sold?round2(cashIn(c)):"",c.sold&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null?round2(+c.soldPrice/+c.mv*100):"",from?from.cert:"",c.sold?fmtDate(c.soldDate):"",c.notes||"",attachN(c.id),...stampCols(c)]})};
 const MONEY_HEAD=["Week","Type","Partner","Amount","Date","Note","Added By","Added At","Last Edited By","Last Edited At"];
-const moneyRows=(w,label)=>[...w.spend.map(x=>[label,"Spend",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
+const moneyRows=(w,label)=>[...w.spend.map(x=>[label,x.kind==="loan"?"Loan":"Spend",x.kind==="loan"?x.partner+" to "+x.to:x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
 function summaryRows(w,label){
   const t=calc(w);
   const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit (unsold slabs at consignor payout)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Profit share","Total owed","Paid out","Still owed"]];
@@ -671,7 +677,10 @@ function render(){
   if(ui.recovery){renderNewPassword();return}
   if(!me){renderLogin();return}
   if(!state){$("#app").innerHTML='<div class="welcome"><p class="hint">Loading...</p></div>';return}
-  const prev=$("#scroller"),top=ui.top?0:(prev?prev.scrollTop:0);ui.top=false;
+  const prev=$("#scroller"),key=ui.hist?"h:"+ui.hist:ui.tab;
+  // remember where each screen was scrolled to; iPhones can drop a single scrollTop set after a redraw
+  if(!ui.pos)ui.pos={};
+  const top=ui.top?0:(ui.pos[key]||0);ui.top=false;
   let title="Repack Ledger",sub="Week started "+fmtDate(state.week.start)+" | "+me.name,body="",back="";
   if(ui.hist){const h=state.history.find(x=>x.id===ui.hist);if(h){title=h.label;sub=fmtDate(h.start)+" - "+fmtDate(h.end);body=histDetail(h);back='<button class="icon" data-act="back" aria-label="Back">'+ic("back",18)+"</button>"}else ui.hist=null}
   if(!ui.hist){body={cards:cardsView,money:moneyView,summary:summaryView,history:historyView,activity:activityView}[ui.tab]()}
@@ -680,7 +689,9 @@ function render(){
   $("#app").innerHTML='<header><div class="hl">'+(back||'<img class="logo" src="icon-192.png" alt="">')+'<div class="ht"><h1>'+esc(title)+"</h1><p>"+esc(sub)+'</p></div></div><div class="hr"><div id="presence">'+presenceHTML()+'</div><button class="avatar" data-act="settings" aria-label="Account and settings">'+avatarHTML(me.name,38)+"</button></div></header>"+
   '<div id="scroller">'+(ui.offline?'<div class="banner"><span>Offline. Showing the last saved data. Reconnect to make changes.</span></div>':"")+dueBanner()+"<main>"+body+"</main></div>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
   "<nav>"+tabs.map(t=>'<button data-act="tab" data-id="'+t[0]+'" class="'+(!ui.hist&&ui.tab===t[0]||ui.hist&&t[0]==="history"?"on":"")+'"><span class="nb">'+ic(t[0],22)+"</span>"+t[1]+"</button>").join("")+"</nav>";
-  const sc=$("#scroller");if(sc&&top)sc.scrollTop=top;
+  const sc=$("#scroller");
+  if(sc){sc.dataset.key=key;ui.pos[key]=top;sc.addEventListener("scroll",()=>{ui.pos[key]=sc.scrollTop},{passive:true});
+    if(top){const put=()=>{if(sc.isConnected&&Math.abs(sc.scrollTop-ui.pos[key])>2&&ui.pos[key]===top)sc.scrollTop=top};sc.scrollTop=top;requestAnimationFrame(put);setTimeout(put,80);setTimeout(put,300)}}
   hydrateThumbs($("#app"));trackMe();
 }
 function cardRowHTML(c,edit,view){
@@ -695,7 +706,7 @@ function cardRowHTML(c,edit,view){
   const pre=edit==="sel"?'<span class="selc'+(picked?" on":"")+'">'+(picked?ic("check",15):"")+"</span>":"";
   const first=n?attachList(c.id)[0]:null;
   const th='<div class="thumbsm '+(first?"":oc)+'">'+(first?'<img data-path="'+esc(first.path)+'" alt="">':ic("cards",20))+"</div>";
-  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"");
+  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Carried to next week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"");
   return '<div class="row'+(act?"":" static")+(picked?" picked":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
 function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
@@ -730,8 +741,8 @@ function cardsView(){
   '<div id="cardlist">'+cardListHTML()+"</div>";
 }
 function entryRow(x,kind,act){
-  const n=attachN(x.id),pay=kind!=="spend";
-  return '<div class="row'+(act?"":" static")+'"'+(act?' data-act="edit-entry" data-kind="'+kind+'" data-id="'+x.id+'"':"")+'><div class="thumbsm ent'+(pay?" pay":"")+'">'+ic(pay?"send":"cart",18)+'</div><div class="main"><div class="desc one">'+esc(x.partner)+(act?"":'<span class="badge ok" style="margin-left:6px">'+(pay?"Payout":"Spend")+"</span>")+'</div><div class="sub">'+fmtDate(x.date)+(x.note?" | "+esc(x.note):"")+(x.updatedBy?" | "+esc(x.updatedBy):"")+"</div>"+(n?'<div class="pills"><span class="badge ok">'+n+" photo"+(n>1?"s":"")+"</span></div>":"")+'</div><div class="amt"><b>'+money(+x.amount||0)+"</b></div></div>";
+  const n=attachN(x.id),pay=kind!=="spend",loan=!pay&&x.kind==="loan";
+  return '<div class="row'+(act?"":" static")+'"'+(act?' data-act="edit-entry" data-kind="'+kind+'" data-id="'+x.id+'"':"")+'><div class="thumbsm ent'+(pay||loan?" pay":"")+'">'+ic(pay||loan?"send":"cart",18)+'</div><div class="main"><div class="desc one">'+esc(x.partner)+(loan?" to "+esc(x.to):"")+(loan?'<span class="badge rp-pending" style="margin-left:6px">Loan</span>':act?"":'<span class="badge ok" style="margin-left:6px">'+(pay?"Payout":"Spend")+"</span>")+'</div><div class="sub">'+fmtDate(x.date)+(x.note?" | "+esc(x.note):"")+(x.updatedBy?" | "+esc(x.updatedBy):"")+"</div>"+(n?'<div class="pills"><span class="badge ok">'+n+" photo"+(n>1?"s":"")+"</span></div>":"")+'</div><div class="amt"><b>'+money(+x.amount||0)+"</b></div></div>";
 }
 function ledgerList(list,kind){
   if(!list.length)return emptyBox(kind==="spend"?"cart":"send",kind==="spend"?"No buys or spend yet.":"No payouts yet.");
@@ -762,13 +773,22 @@ function activityView(){
 function partnerTiles(w){
   return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),pct=c.owed>0?Math.min(100,Math.max(0,c.paid/c.owed*100)):0;return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Still owed</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk"><span>Spent</span><span>'+money(c.spent)+'</span><span>+ Half profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span>- Paid</span><span>'+money(c.paid)+"</span></div></div>"}).join("")+"</div>";
 }
+// filter chips for the Money lists: by partner, plus loans for spend
+function moneyFilter(kind,list){
+  const P=state.settings.partners,cur=(ui.mf||{})[kind]||"";
+  const opts=[["","All"],...P.map(p=>[p,p])];if(kind==="spend"&&list.some(x=>x.kind==="loan"))opts.push(["__loan","Loans"]);
+  const pick=cur==="__loan"?list.filter(x=>x.kind==="loan"):cur?list.filter(x=>x.partner===cur||(x.kind==="loan"&&x.to===cur)):list;
+  const tot=sum(pick.filter(x=>x.kind!=="loan"),x=>x.amount);
+  const chips=list.length?'<div class="chips mf">'+opts.map(o=>'<button class="chip '+(cur===o[0]?"on":"")+'" data-act="money-f" data-kind="'+kind+'" data-id="'+esc(o[0])+'">'+esc(o[1])+"</button>").join("")+'</div><div class="mftot">'+pick.length+(pick.length===1?" entry":" entries")+(cur==="__loan"?"":" | "+money(tot))+"</div>":"";
+  return chips+(list.length&&!pick.length?emptyBox(kind==="spend"?"cart":"send","Nothing for this filter."):ledgerList(pick,kind));
+}
 function moneyView(){
   const w=state.week;
-  return partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+ledgerList(w.spend,"spend")+
-  '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+ledgerList(w.payouts,"payouts");
+  return partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
+  '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+moneyFilter("payouts",w.payouts);
 }
 function tilesFor(t){
-  return '<div class="hero"><span>Expected profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Unsold at payout '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="hsub">If every slab still in stock sells at its consignor payout</div>'+(t.spent>0&&t.spent>t.due+t.proceeds&&t.stockN+t.soldN>0?'<div class="hwarn">Spent is more than everything in the app is worth. If some slabs are not entered yet, add them and this will balance out.</div>':"")+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock")+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
+  return '<div class="hero"><span>Expected profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Unsold at payout '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="hsub">If every slab still in stock sells at its consignor payout</div>'+(t.spent>0&&t.spent>t.due+t.proceeds&&t.stockN+t.soldN>0?'<div class="hwarn">Spent is more than everything in the app is worth. If some slabs are not entered yet, add them and this will balance out.</div>':"")+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
   return partnerTiles(w)+'<p class="hint">Each partner gets back what they spent plus half the profit. Payouts already made come off that.</p>';
@@ -1299,6 +1319,15 @@ function photoWidget(el,kind,entityId){
 // ---------- card / entry modals ----------
 function field(label,inner){return "<label>"+label+"</label>"+inner}
 const dispOf=c=>!c.sold?"stock":(c.saleType==="traded"?"traded":"sold");
+// segmented buttons drive a hidden select named by data-for in the same form
+function wireSeg(el){
+  el.querySelectorAll(".seg[data-for]").forEach(sg=>{
+    const f=sg.closest("form"),sl=f&&f.elements[sg.dataset.for],hint=sg.nextElementSibling;if(!sl)return;
+    const paintSeg=()=>{let h="";sg.querySelectorAll("button").forEach(b=>{const on=b.dataset.v===sl.value;b.classList.toggle("on",on);if(on)h=b.dataset.h||""});if(hint&&hint.classList.contains("seghint"))hint.textContent=h};
+    sg.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;sl.value=b.dataset.v;sl.dispatchEvent(new Event("change",{bubbles:true}));paintSeg()});
+    sl.addEventListener("change",paintSeg);paintSeg();
+  });
+}
 function cardModal(id,carry){
   const w=state.week,c=id?w.cards.find(x=>x.id===id):null;
   if(id&&!c){toast("That card was changed or removed");return}
@@ -1335,12 +1364,7 @@ function cardModal(id,carry){
   hydrateThumbs(el.querySelector(".ehead"));
   const f=$("#cf",el);
   const ph=photoWidget(el,"cards",id);
-  el.querySelectorAll(".seg").forEach(sg=>{
-    const sl=f[sg.dataset.for],hint=sg.nextElementSibling;
-    const paintSeg=()=>{let h="";sg.querySelectorAll("button").forEach(b=>{const on=b.dataset.v===sl.value;b.classList.toggle("on",on);if(on)h=b.dataset.h});if(hint&&hint.classList.contains("seghint"))hint.textContent=h};
-    sg.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;sl.value=b.dataset.v;sl.dispatchEvent(new Event("change",{bubbles:true}));paintSeg()});
-    sl.addEventListener("change",paintSeg);paintSeg();
-  });
+  wireSeg(el);
   if(f.repack)f.repack.addEventListener("change",()=>{const wv=$("#rpwho",el);if(wv)wv.style.display=f.repack.value?"":"none"});
   f.cert.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&f.cert.value.trim()){e.preventDefault();f.cert.value=normalizeCert(f.cert.value);f.desc.focus()}});
   f.cert.addEventListener("change",()=>{f.cert.value=normalizeCert(f.cert.value)});
@@ -1356,7 +1380,7 @@ function cardModal(id,carry){
     st.className="psast ok";st.textContent="Found: "+r.title+(r.pop?" | Pop "+r.pop:"")+(n?" | "+n+" PSA photo"+(n>1?"s":"")+" added, saved when you tap Save":"");
   });
   const camOff=()=>{stopCamera();$("#cvw",el).hidden=true;$("#camopts",el).hidden=true;$("#certcam",el).textContent="Scan"};
-  const gotCert=c=>{f.cert.value=c;camOff();beep(true);if(state.hasRepack!==undefined&&!f.desc.value.trim())f.desc.focus()};
+  const gotCert=c=>{f.cert.value=c;camOff();beep(true)};
   $("#certcam",el).addEventListener("click",async()=>{
     const w=$("#cvw",el);
     if(!w.hidden){camOff();return}
@@ -1461,18 +1485,23 @@ function entryModal(kind,id){
   const w=state.week,list=w[kind],x=id?list.find(e=>e.id===id):null;
   if(id&&!x){toast("That entry was changed or removed");return}
   const d=x||{partner:state.settings.partners[0],amount:"",date:todayISO(),note:""};
-  const nm=kind==="spend"?"spend (a buy)":"payout";
-  const el=modal("<h2>"+(x?"Edit ":"Add ")+nm+'</h2><form id="ef">'+field("Partner",'<select name="partner">'+(kind==="payouts"&&!x?'<option value="__both" selected>Both, split 50/50</option>':"")+state.settings.partners.map(p=>"<option"+(x&&p===d.partner?" selected":"")+">"+esc(p)+"</option>").join("")+"</select>")+(kind==="payouts"&&!x?'<p class="hint" id="bothhint">Enter the total you are paying out. Each partner gets half.</p>':"")+
+  const nm=kind==="spend"?"spend (a buy)":"payout",P=state.settings.partners,canLoan=kind==="spend"&&state.hasLoan,isLoan=canLoan&&d.kind==="loan";
+  const loanHTML=canLoan?field("Type",'<div class="seg" data-for="ekind"><button type="button" data-v="buy">Buy</button><button type="button" data-v="loan">Loan to partner</button></div><select name="ekind" class="hidesel"><option value="buy"'+(isLoan?"":" selected")+'>buy</option><option value="loan"'+(isLoan?" selected":"")+">loan</option></select>"):"";
+  const toHTML=canLoan?'<div id="loanto"'+(isLoan?"":" hidden")+">"+field("Lent to",'<select name="to">'+P.map(p=>"<option"+(p===(d.to||P.find(q=>q!==d.partner))?" selected":"")+">"+esc(p)+"</option>").join("")+"</select>")+'<p class="hint">A loan is not spend. It moves that amount from the borrower\'s balance to the lender\'s, so the lender gets it back at payout.</p></div>':"";
+  const el=modal("<h2>"+(x?"Edit ":"Add ")+nm+'</h2><form id="ef">'+loanHTML+field('<span id="plbl">'+(isLoan?"Lent by":"Partner")+"</span>",'<select name="partner">'+(kind==="payouts"&&!x?'<option value="__both" selected>Both, split 50/50</option>':"")+state.settings.partners.map(p=>"<option"+(x&&p===d.partner?" selected":"")+">"+esc(p)+"</option>").join("")+"</select>")+(kind==="payouts"&&!x?'<p class="hint" id="bothhint">Enter the total you are paying out. Each partner gets half.</p>':"")+toHTML+
     '<div class="two"><div>'+field("Amount ($)",'<input name="amount" type="number" step="0.01" inputmode="decimal" required value="'+esc(d.amount)+'">')+"</div><div>"+field("Date",'<input type="date" name="date" value="'+esc(d.date)+'">')+"</div></div>"+
     field("Note",'<input name="note" placeholder="Zelle, cash, lot name" value="'+esc(d.note||"")+'">')+
     photoHTML(kind==="spend"?"Photos of the buy (receipt, screenshots, the slabs)":"Photos (Zelle screenshot, receipt)")+
     '<p class="hint">'+whoText(x)+"</p>"+
     '<div class="actions"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button>'+(x?'<button class="btn danger" type="button" id="dele">Delete</button>':"")+"</div></form>");
   const ph=photoWidget(el,kind,id);
+  if(canLoan){const ef=$("#ef",el),sync=()=>{const ln=ef.ekind.value==="loan";$("#loanto",el).hidden=!ln;$("#plbl",el).textContent=ln?"Lent by":"Partner";if(ln&&ef.to.value===ef.partner.value){const o=P.find(q=>q!==ef.partner.value);if(o)ef.to.value=o}};
+    wireSeg(el);ef.ekind.addEventListener("change",sync);ef.partner.addEventListener("change",sync);sync()}
   const bh=$("#bothhint",el);if(bh)$("#ef",el).partner.addEventListener("change",e=>{bh.hidden=e.target.value!=="__both"});
   $("#ef",el).addEventListener("submit",async e=>{
     e.preventDefault();const f=e.target;busy(f,true);
     const row={partner:f.partner.value,amount:+f.amount.value,entry_date:f.date.value||todayISO(),note:f.note.value.trim()};
+    if(canLoan){row.kind=f.ekind.value;row.to_partner=row.kind==="loan"?f.to.value:null;if(row.kind==="loan"&&row.to_partner===row.partner){toast("Pick two different partners for a loan");busy(f,false);return}}
     let eid=id,r;
     if(row.partner==="__both"){
       const P=state.settings.partners,half=round2(row.amount/P.length);
@@ -1811,6 +1840,7 @@ const actions={
   tab(id){ui.tab=id;ui.hist=null;ui.sel=null;ui.top=true;render()},
   "sel-mode"(){ui.sel=new Set();ui.filter="stock";render()},
   "sel-cancel"(){ui.sel=null;render()},
+  "money-f"(id,b){ui.mf=ui.mf||{};ui.mf[b.dataset.kind]=id||"";render()},
   "toggle-sel"(id,row){const c=state.week.cards.find(x=>x.id===id);if(!c||!ui.sel)return;if(ui.sel.has(id))ui.sel.delete(id);else ui.sel.add(id);
     // update just this row and the bar so the list never redraws or jumps
     const on=ui.sel.has(id),mk=row&&row.querySelector(".selc"),bar=$("#app .selbar");
@@ -1879,6 +1909,25 @@ document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document
 window.addEventListener("online",()=>{if(sb&&me)softRefresh()});
 
 // ---------- full-screen height (iPhone home screen apps report a short height) ----------
+// when the iPhone keyboard is up, fit open forms into the visible area and keep the box being typed in on screen
+function applyKeyboard(vh,vt){
+  const de=document.documentElement,kb=Math.max(0,window.innerHeight-vh-vt);
+  if(kb>80){de.classList.add("kbopen");de.style.setProperty("--vvh",vh+"px");de.style.setProperty("--vvt",vt+"px")}
+  else de.classList.remove("kbopen");
+  return kb>80;
+}
+function keepFieldVisible(){
+  const a=document.activeElement;if(!a||!a.closest)return;
+  const sh=a.closest(".sheet");if(!sh||sh.classList.contains("fullscan")||!/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return;
+  const r=a.getBoundingClientRect(),sr=sh.getBoundingClientRect(),pad=70;
+  if(r.bottom>sr.bottom-pad||r.top<sr.top+20)sh.scrollTop+=r.top-sr.top-sr.height/3;
+}
+if(window.visualViewport){
+  const vv=window.visualViewport;let kt;
+  const onVV=()=>{const open=applyKeyboard(vv.height,vv.offsetTop);if(open){clearTimeout(kt);kt=setTimeout(keepFieldVisible,60)}};
+  vv.addEventListener("resize",onVV);vv.addEventListener("scroll",onVV);
+  document.addEventListener("focusin",()=>{setTimeout(()=>{onVV();keepFieldVisible()},320)});
+}
 function fitShell(){
   let h=window.innerHeight;
   const mm=q=>!!(window.matchMedia&&window.matchMedia(q).matches);
