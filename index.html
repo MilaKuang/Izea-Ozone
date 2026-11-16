@@ -13,8 +13,8 @@
 <link rel="icon" href="icon-192.png">
 <title>Repack Ledger</title>
 <style>
-:root{--bg:#f4f5f7;--card:#fff;--ink:#0b1324;--ink2:#334155;--mute:#6b7280;--line:#e6e8ec;--acc:#0d9488;--acc-ink:#fff;--acc-soft:#d5f5ef;--acc-soft-ink:#0f5f57;--neg:#dc2626;--pos:#059669;--chip:#eceef2;--warn:#fef3c7;--warn-ink:#92400e;--o0:#e8ebff;--o0-ink:#4338ca;--o1:#ffeedd;--o1-ink:#c2410c;--os:#eceef2;--os-ink:#475569;--sold:#dcfce7;--sold-ink:#166534;--trade:#f3e8ff;--trade-ink:#7e22ce;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);--hero1:#0f766e;--hero2:#123f3b;--glass:rgba(244,245,247,.86);--navglass:rgba(255,255,255,.9)}
-@media(prefers-color-scheme:dark){:root{--bg:#090e18;--card:#111a2a;--ink:#e8ecf3;--ink2:#cbd5e1;--mute:#93a0b4;--line:#1d283b;--acc:#2dd4bf;--acc-ink:#03211f;--acc-soft:#0e2f2c;--acc-soft-ink:#5eead4;--neg:#f87171;--pos:#34d399;--chip:#1a2436;--warn:#382707;--warn-ink:#fcd34d;--o0:#1f1d4a;--o0-ink:#a5b4fc;--o1:#3a1e0c;--o1-ink:#fdba74;--os:#1a2436;--os-ink:#b6c2d4;--sold:#0f2e1c;--sold-ink:#86efac;--trade:#2a1640;--trade-ink:#d8b4fe;--shadow:none;--hero1:#0f5f58;--hero2:#0a2724;--glass:rgba(9,14,24,.86);--navglass:rgba(17,26,42,.92)}}
+:root{--bg:#f4f5f7;--card:#fff;--ink:#0b1324;--ink2:#334155;--mute:#6b7280;--line:#e6e8ec;--acc:#0d9488;--acc-ink:#fff;--acc-soft:#d5f5ef;--acc-soft-ink:#0f5f57;--neg:#dc2626;--pos:#059669;--chip:#eceef2;--warn:#fef3c7;--warn-ink:#92400e;--o0:#e8ebff;--o0-ink:#4338ca;--o1:#ffeedd;--o1-ink:#c2410c;--os:#eceef2;--os-ink:#475569;--sold:#dcfce7;--sold-ink:#166534;--trade:#f3e8ff;--trade-ink:#7e22ce;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);--hero1:#0f766e;--hero2:#123f3b;--acc2:#dbeafe;--acc2-ink:#1d4ed8;--rej:#fee2e2;--rej-ink:#b91c1c;--glass:rgba(244,245,247,.86);--navglass:rgba(255,255,255,.9)}
+@media(prefers-color-scheme:dark){:root{--bg:#090e18;--card:#111a2a;--ink:#e8ecf3;--ink2:#cbd5e1;--mute:#93a0b4;--line:#1d283b;--acc:#2dd4bf;--acc-ink:#03211f;--acc-soft:#0e2f2c;--acc-soft-ink:#5eead4;--neg:#f87171;--pos:#34d399;--chip:#1a2436;--warn:#382707;--warn-ink:#fcd34d;--o0:#1f1d4a;--o0-ink:#a5b4fc;--o1:#3a1e0c;--o1-ink:#fdba74;--os:#1a2436;--os-ink:#b6c2d4;--sold:#0f2e1c;--sold-ink:#86efac;--trade:#2a1640;--trade-ink:#d8b4fe;--shadow:none;--hero1:#0f5f58;--hero2:#0a2724;--acc2:#13264a;--acc2-ink:#93c5fd;--rej:#3b1414;--rej-ink:#fca5a5;--glass:rgba(9,14,24,.86);--navglass:rgba(17,26,42,.92)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 body.noscroll{overflow:hidden}
@@ -97,6 +97,9 @@ select.mini{padding:8px 10px;font-size:14px;border-radius:10px;background:var(--
 .badge.os{background:var(--os);color:var(--os-ink)}
 .badge.sold{background:var(--sold);color:var(--sold-ink)}
 .badge.trade{background:var(--trade);color:var(--trade-ink)}
+.badge.rp-pending{background:var(--warn);color:var(--warn-ink)}
+.badge.rp-accepted{background:var(--acc2,#dbeafe);color:var(--acc2-ink,#1d4ed8)}
+.badge.rp-rejected{background:var(--rej,#fee2e2);color:var(--rej-ink,#b91c1c)}
 .badge.age{background:transparent;color:var(--mute);border:1px solid var(--line);padding:3px 7px}
 .badge.age.old{background:var(--warn);color:var(--warn-ink);border-color:transparent}
 .thumbsm{width:42px;height:42px;border-radius:11px;background:var(--chip);flex:0 0 auto;display:grid;place-items:center;overflow:hidden;color:var(--mute);align-self:flex-start}
@@ -283,9 +286,10 @@ function cfg(){
 
 // ---------- row mapping ----------
 const num=v=>v==null?"":+v;
-const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
+const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
 const mapEntry=r=>({id:r.id,partner:r.partner,amount:+r.amount,date:r.entry_date||"",note:r.note||"",cardId:r.card_id,createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
-const cardRow=r=>({date_purchased:r.date||null,cert:r.cert||null,description:r.desc||"",owner:r.owner,market_value:r.mv===""?null:+r.mv,consignor_pct:+r.pct,sold:!!r.sold,sale_type:r.sold?(r.saleType||"sold"):null,sold_price:(r.soldPrice===""||r.soldPrice==null)?null:+r.soldPrice,sold_date:r.soldDate||null,trade_cash:(r.sold&&r.saleType==="traded"&&r.tradeCash!==""&&r.tradeCash!=null)?+r.tradeCash:null,notes:r.notes||""});
+const cardRow=r=>{const o=cardRow0(r);if(state&&state.hasRepack){o.repack_status=r.repack||null;o.repack_date=r.repack?(r.repackDate||todayISO()):null}return o};
+const cardRow0=r=>({date_purchased:r.date||null,cert:r.cert||null,description:r.desc||"",owner:r.owner,market_value:r.mv===""?null:+r.mv,consignor_pct:+r.pct,sold:!!r.sold,sale_type:r.sold?(r.saleType||"sold"):null,sold_price:(r.soldPrice===""||r.soldPrice==null)?null:+r.soldPrice,sold_date:r.soldDate||null,trade_cash:(r.sold&&r.saleType==="traded"&&r.tradeCash!==""&&r.tradeCash!=null)?+r.tradeCash:null,notes:r.notes||""});
 
 async function fetchAll(table,order){
   let out=[],from=0;
@@ -299,12 +303,13 @@ async function fetchAll(table,order){
   return out;
 }
 async function loadAll(){
-  const [st,wk,cd,sp,po,at,au,mb]=await Promise.all([
+  const [st,wk,cd,sp,po,at,au,mb,rp]=await Promise.all([
     sb.from("settings").select("*").eq("id",1).single(),
     sb.from("weeks").select("*").order("start_date",{ascending:true}),
     fetchAll("cards"),fetchAll("spend"),fetchAll("payouts"),fetchAll("attachments","created_at"),
     sb.from("audit").select("*").order("id",{ascending:false}).limit(300),
-    sb.from("members").select("*")
+    sb.from("members").select("*"),
+    sb.from("cards").select("repack_status").limit(1)
   ]);
   for(const r of [st,wk,au])if(r.error)throw r.error;
   const by=(rows,map)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.week_id))m.set(r.week_id,[]);m.get(r.week_id).push(map(r))});return m};
@@ -314,7 +319,7 @@ async function loadAll(){
   if(!open)throw new Error("No open week found. Re-run setup.sql.");
   const history=wk.data.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
   const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
-  state={members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct},week:mk(open),history,audit:au.data};
+  state={hasRepack:!!(rp&&!rp.error),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct},week:mk(open),history,audit:au.data};
   ui.offline=false;
   try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state}))}catch(e){}
 }
@@ -341,7 +346,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=13;
+const APP_VERSION=14;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -386,7 +391,8 @@ function calc(w){
   const mv=sum(stock,c=>c.mv),due=sum(stock,payoutOf),proceeds=sum(sold,cashIn);
   const spent=sum(w.spend,x=>x.amount),paid=sum(w.payouts,x=>x.amount);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),ssp=sum(so,c=>c.soldPrice);
-  return{soldPct:smv>0?ssp/smv*100:null,stockN:stock.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
+  const acc=stock.filter(c=>c.repack==="accepted"),pend=stock.filter(c=>c.repack==="pending");
+  return{accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
 }
 function pcalc(w,p){
   const spent=sum(w.spend.filter(x=>x.partner===p),x=>x.amount);
@@ -426,13 +432,13 @@ async function exportFile(name,text,mime){
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
 }
 const stampCols=o=>[o.createdBy||"",o.createdAt?fmtTime(o.createdAt):"",o.updatedBy||"",o.updatedAt?fmtTime(o.updatedAt):""];
-const CARD_HEAD=["Week","Date Purchased","PSA Cert #","Item Description","Owner","Market Value","Consignor %","Consignor Payout","Status","Sold Price / Trade Value","Cash Received","% of Market","Received In Trade For (Cert)","Sold Date","Notes","Photos","Added By","Added At","Last Edited By","Last Edited At"];
-const cardRows=(w,label)=>{const byId=new Map(w.cards.map(c=>[c.id,c]));return w.cards.map(c=>{const st=c.sold?(c.saleType==="traded"?"Traded":"Sold"):"In stock";const from=c.fromCardId&&byId.get(c.fromCardId);return [label,fmtDate(c.date),c.cert,c.desc,c.owner,round2(+c.mv||0),+c.pct||0,round2(payoutOf(c)),st,c.sold?round2(+c.soldPrice||0):"",c.sold?round2(cashIn(c)):"",c.sold&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null?round2(+c.soldPrice/+c.mv*100):"",from?from.cert:"",c.sold?fmtDate(c.soldDate):"",c.notes||"",attachN(c.id),...stampCols(c)]})};
+const CARD_HEAD=["Week","Date Purchased","PSA Cert #","Item Description","Owner","Market Value","Consignor %","Consignor Payout","Status","Triumph Status","Sold Price / Trade Value","Cash Received","% of Market","Received In Trade For (Cert)","Sold Date","Notes","Photos","Added By","Added At","Last Edited By","Last Edited At"];
+const cardRows=(w,label)=>{const byId=new Map(w.cards.map(c=>[c.id,c]));return w.cards.map(c=>{const st=c.sold?(c.saleType==="traded"?"Traded":"Sold"):"In stock";const from=c.fromCardId&&byId.get(c.fromCardId);return [label,fmtDate(c.date),c.cert,c.desc,c.owner,round2(+c.mv||0),+c.pct||0,round2(payoutOf(c)),st,c.repack?REPACK[c.repack]:"",c.sold?round2(+c.soldPrice||0):"",c.sold?round2(cashIn(c)):"",c.sold&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null?round2(+c.soldPrice/+c.mv*100):"",from?from.cert:"",c.sold?fmtDate(c.soldDate):"",c.notes||"",attachN(c.id),...stampCols(c)]})};
 const MONEY_HEAD=["Week","Type","Partner","Amount","Date","Note","Added By","Added At","Last Edited By","Last Edited At"];
 const moneyRows=(w,label)=>[...w.spend.map(x=>[label,"Spend",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
 function summaryRows(w,label){
   const t=calc(w);
-  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold",t.soldN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Profit",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Paid out","Left over"]];
+  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by Triumph",t.accN],["Accepted payout (Triumph owes)",t.accDue],["Pending at Triumph",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Profit",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Paid out","Left over"]];
   state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.paid,c.left])});
   return rows;
 }
@@ -537,6 +543,7 @@ const ownerCls=o=>{const P=state.settings.partners;return o===P[0]?"o0":o===P[1]
 const daysIn=c=>{if(!c.date)return null;const d=Math.round((parseISO(todayISO())-parseISO(c.date))/864e5);return d>=0?d:null};
 const AVC=["#6366f1","#f97316","#0d9488","#e11d48","#0ea5e9","#a855f7"];
 const avColor=n=>{let h=0;for(const ch of String(n||""))h=(h*31+ch.charCodeAt(0))>>>0;return AVC[h%AVC.length]};
+const REPACK={pending:"Pending at Triumph",accepted:"Accepted by Triumph",rejected:"Rejected by Triumph"};
 const plural=(n,w)=>n+" "+w+(n===1?"":"s");
 function memberOf(name){return ((state&&state.members)||[]).find(m=>m.name===name)}
 function avatarHTML(name,size){
@@ -596,16 +603,17 @@ function cardRowHTML(c,edit,view){
   let right,sub2;
   if(c.sold&&c.saleType==="traded"){right=money(+c.soldPrice||0);sub2=+c.tradeCash?money(+c.tradeCash)+" cash":"trade value"}
   else if(c.sold){right=money(+c.soldPrice||0);sub2=(+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null)?round2(+c.soldPrice/+c.mv*100)+"% of market":"sale price"}
+  else if(c.repack==="accepted"){right=money(payoutOf(c));sub2="Triumph pays"}
   else{right=money(+c.mv||0);sub2=(+c.pct||0)+"% = "+money(payoutOf(c))}
   const act=edit==="sel"?"toggle-sel":edit?"edit-card":view?"view-card":"";
   const picked=edit==="sel"&&ui.sel&&ui.sel.has(c.id);
   const pre=edit==="sel"?'<span class="selc'+(picked?" on":"")+'">'+(picked?ic("check",15):"")+"</span>":"";
   const first=n?attachList(c.id)[0]:null;
   const th='<div class="thumbsm '+(first?"":oc)+'">'+(first?'<img data-path="'+esc(first.path)+'" alt="">':ic("cards",20))+"</div>";
-  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"");
+  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+REPACK[c.repack]+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"");
   return '<div class="row'+(act?"":" static")+(picked?" picked":"")+(edit==="sel"&&c.sold?" dim":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
-function statusOk(c,f){return f==="stock"?!c.sold:f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
+function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
 function filteredCards(){
   const q=ui.q.trim().toLowerCase();
   const l=state.week.cards.filter(c=>statusOk(c,ui.filter)&&(!ui.owner||c.owner===ui.owner)&&(!q||(c.desc+" "+(c.cert||"")+" "+c.owner+" "+(c.notes||"")).toLowerCase().includes(q))).slice();
@@ -625,10 +633,10 @@ function cardListHTML(){
 function paintList(){const el=$("#cardlist");if(el){el.innerHTML=cardListHTML();hydrateThumbs(el)}}
 function cardsView(){
   const t=calc(state.week),P=state.settings.partners,cs=state.week.cards.filter(c=>!ui.owner||c.owner===ui.owner);
-  const chips=[["all","All"],["stock","In stock"],["sold","Sold/Traded"],["need","Needs details"]];
+  const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
-  return '<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><div class="hstats"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Payout due</span><b>'+money(t.due)+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>"+
-  (ui.sel?'<div class="selhint">Tap in-stock cards to select them, then tap Sell at %.</div>':
+  return '<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>"+
+  (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select them.</span>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Set Triumph status</button>':"")+"</div>":
   '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Sell many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
@@ -646,7 +654,7 @@ function ledgerList(list,kind){
 }
 const ACT_VERB={insert:"added",update:"edited",delete:"deleted"};
 const ACT_ENT={cards:"card",spend:"spend",payouts:"payout",weeks:"week",settings:"settings",attachments:"photo"};
-const COL_NAMES={description:"description",market_value:"market value",consignor_pct:"consignor %",sold_price:"sale price",sold_date:"sold date",date_purchased:"date",entry_date:"date",card_id:"card",split_done:"split done",reset_day:"reset day",default_pct:"default %",closed_by:"closed by",end_date:"end date",week_id:"week",sale_type:"how it left",trade_cash:"trade cash",from_card_id:"trade-in for"};
+const COL_NAMES={description:"description",market_value:"market value",consignor_pct:"consignor %",sold_price:"sale price",sold_date:"sold date",date_purchased:"date",entry_date:"date",card_id:"card",split_done:"split done",reset_day:"reset day",default_pct:"default %",closed_by:"closed by",end_date:"end date",week_id:"week",sale_type:"how it left",trade_cash:"trade cash",from_card_id:"trade-in for",repack_status:"Triumph status",repack_date:"Triumph date"};
 const prettyDetail=s=>String(s||"").replace(/(^|; )([a-z_]+):/g,(m,a,k)=>a+(COL_NAMES[k]||k)+":");
 function dayLabel(ts){
   const k=isoOf(new Date(ts)),t=new Date();if(k===isoOf(t))return "Today";
@@ -674,7 +682,7 @@ function moneyView(){
   '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+ledgerList(w.payouts,"payouts");
 }
 function tilesFor(t){
-  return '<div class="hero"><span>Profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Payout due '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+"</span></div>"+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock")+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
+  return '<div class="hero"><span>Profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Payout due '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+"</span></div>"+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock")+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by Triumph",t.accN,"Triumph owes "+money(t.accDue))+tile("Pending at Triumph",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
   return "<table><tr><th>Partner</th><th>Spent</th><th>Paid</th><th>Left</th></tr>"+state.settings.partners.map(p=>{const c=pcalc(w,p);return "<tr><td>"+esc(p)+"</td><td>"+money(c.spent)+"</td><td>"+money(c.paid)+'</td><td class="'+(c.left<0?"neg":"")+'">'+money(c.left)+"</td></tr>"}).join("")+"</table>";
@@ -778,26 +786,65 @@ function loadZX(){
   if(!zxP)zxP=new Promise((res,rej)=>{const s=document.createElement("script");s.src="zxing.min.js";s.onload=res;s.onerror=()=>{zxP=null;rej(new Error("zx"))};document.head.appendChild(s)});
   return zxP;
 }
+function zxHints(){
+  const H=new Map(),F=ZXing.BarcodeFormat;
+  H.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[F.CODE_128,F.QR_CODE,F.CODE_39,F.DATA_MATRIX,F.ITF]);
+  H.set(ZXing.DecodeHintType.TRY_HARDER,true);
+  return H;
+}
 async function startCamera(video,onCode){
   stopCamera();
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast("Camera needs the app opened over https");return false}
   let last="",lastT=0;
   const emit=t=>{const n=Date.now();if(t===last&&n-lastT<2500)return;last=t;lastT=n;onCode(t)};
+  const cons={video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false};
   try{
-    if("BarcodeDetector" in window){
-      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+    let native=false;
+    if("BarcodeDetector" in window){try{const f=await BarcodeDetector.getSupportedFormats();native=f.includes("code_128")||f.includes("qr_code")}catch(e){}}
+    if(native){
+      const stream=await navigator.mediaDevices.getUserMedia(cons);
       video.srcObject=stream;await video.play();
-      const det=new BarcodeDetector();let on=true;
-      (async()=>{while(on){try{const r=await det.detect(video);if(r.length)emit(r[0].rawValue)}catch(e){}await new Promise(r=>setTimeout(r,200))}})();
+      const det=new BarcodeDetector({formats:["code_128","qr_code","code_39","data_matrix","itf"]});let on=true;
+      (async()=>{while(on){try{const r=await det.detect(video);if(r.length)emit(r[0].rawValue)}catch(e){}await new Promise(r=>setTimeout(r,150))}})();
       camStop=()=>{on=false;stream.getTracks().forEach(t=>t.stop());video.srcObject=null};
     }else{
       await loadZX();
-      const reader=new ZXing.BrowserMultiFormatReader();
-      await reader.decodeFromConstraints({video:{facingMode:"environment"},audio:false},video,res=>{if(res)emit(res.getText())});
+      const reader=new ZXing.BrowserMultiFormatReader(zxHints(),120);
+      await reader.decodeFromConstraints(cons,video,res=>{if(res)emit(res.getText())});
       camStop=()=>reader.reset();
     }
+    try{const tr=video.srcObject&&video.srcObject.getVideoTracks()[0],cap=tr&&tr.getCapabilities&&tr.getCapabilities();if(cap&&cap.focusMode&&cap.focusMode.includes("continuous"))await tr.applyConstraints({advanced:[{focusMode:"continuous"}]})}catch(e){}
     return true;
   }catch(e){toast("Could not start the camera. Allow camera access and try again.");camStop=null;return false}
+}
+// read a PSA barcode or QR code from a still photo (the phone camera focuses much better than live video)
+async function readBarcodeFromImage(file){
+  let bmp;
+  try{bmp=window.createImageBitmap?await createImageBitmap(file):await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)})}catch(e){return null}
+  const W=bmp.width||bmp.naturalWidth,H=bmp.height||bmp.naturalHeight;
+  const good=t=>{const c=normalizeCert(t);return /^\d{5,10}$/.test(c)?c:null};
+  if("BarcodeDetector" in window){
+    try{const det=new BarcodeDetector();const r=await det.detect(bmp);for(const x of r){const c=good(x.rawValue);if(c)return c}}catch(e){}
+  }
+  try{await loadZX()}catch(e){return null}
+  const reader=new ZXing.MultiFormatReader();reader.setHints(zxHints());
+  const cv=document.createElement("canvas"),ctx=cv.getContext("2d",{willReadFrequently:true});
+  const tryRegion=(sx,sy,sw,sh,scale)=>{
+    cv.width=Math.max(1,Math.round(sw*scale));cv.height=Math.max(1,Math.round(sh*scale));
+    ctx.drawImage(bmp,sx,sy,sw,sh,0,0,cv.width,cv.height);
+    try{const src=new ZXing.HTMLCanvasElementLuminanceSource(cv);const r=reader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src)));return good(r.getText())}catch(e){return null}
+  };
+  const pause=()=>new Promise(r=>setTimeout(r,0));
+  for(const max of [1600,2400,1000]){const k=Math.min(1,max/Math.max(W,H));const c=tryRegion(0,0,W,H,k);if(c)return c;await pause()}
+  // small barcode: scan overlapping close-up sections at full resolution
+  for(const tile of [Math.round(Math.min(W,H)*0.45),Math.round(Math.min(W,H)*0.3)]){
+    const step=Math.round(tile/2);
+    for(let y=0;y<H;y+=step){for(let x=0;x<W;x+=step){
+      const sw=Math.min(tile,W-x),sh=Math.min(tile,H-y);if(sw<tile/2||sh<tile/2)continue;
+      const c=tryRegion(x,y,sw,sh,Math.min(1,1200/tile));if(c)return c;
+    }await pause()}
+  }
+  return null;
 }
 function newCardRow(o){return Object.assign({week_id:state.week.id},cardRow(Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,soldPrice:"",soldDate:"",notes:""},o)))}
 function scanModal(){
@@ -806,7 +853,7 @@ function scanModal(){
     '<div class="two"><div>'+field("Owner",'<select id="scown">'+["Shared",...state.settings.partners].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" value="'+state.settings.defaultPct+'">')+"</div></div>"+
     field("Cert number",'<div class="certrow"><input id="scin" class="scanin" inputmode="numeric" autocomplete="off" placeholder="Scan or type, then Enter"><button class="btn" id="scadd" type="button">Add</button></div>')+
     '<label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and slab photos</label>'+
-    '<video id="scv" class="video" playsinline muted hidden></video><div class="actions"><button class="btn sec" id="sccam" type="button">Use camera</button><button class="btn" data-act="close-modal" type="button">Done</button></div><div class="sech"><h3 id="sccount"></h3></div><div id="sclist"></div>');
+    '<video id="scv" class="video" playsinline muted hidden></video><p class="hint" id="schint" hidden>Hold the barcode on the label (or the QR code on the back) about 4 to 6 inches away, fill most of the box, and keep it still.</p><input type="file" id="scph" accept="image/*" capture="environment" hidden><div class="actions"><button class="btn sec" id="sccam" type="button">Use camera</button><button class="btn sec" id="scphb" type="button">Photo of label</button><button class="btn" data-act="close-modal" type="button">Done</button></div><div class="sech"><h3 id="sccount"></h3></div><div id="sclist"></div>');
   const inp=$("#scin",el),vid=$("#scv",el);
   const info={};let chain=Promise.resolve();
   const paint=()=>{$("#sccount",el).textContent=added.length?added.length+" added this session":"";$("#sclist",el).innerHTML=added.slice(0,10).map(c=>{const x=info[c]||{};return '<div class="row static"><div class="main"><div class="desc">'+esc(x.title||c)+'</div>'+(x.title?'<div class="sub">Cert '+esc(c)+"</div>":"")+'</div><div class="amt"><span class="badge '+(x.st==="err"?"":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+"</span></div></div>"}).join("")};
@@ -826,9 +873,12 @@ function scanModal(){
   const submit=()=>{const v=inp.value;inp.value="";add(v);inp.focus()};
   inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&inp.value.trim()){e.preventDefault();submit()}});
   $("#scadd",el).addEventListener("click",submit);
+  const scph=$("#scph",el);
+  $("#scphb",el).addEventListener("click",()=>{stopCamera();vid.hidden=true;$("#schint",el).hidden=true;$("#sccam",el).textContent="Use camera";scph.value="";scph.click()});
+  scph.addEventListener("change",async()=>{const file=scph.files[0];if(!file)return;toast("Reading barcode...");const c=await readBarcodeFromImage(file);if(c)add(c);else{beep(false);toast("No barcode found. Get closer to the label, or type the number.")}});
   $("#sccam",el).addEventListener("click",async()=>{
-    if(!vid.hidden){stopCamera();vid.hidden=true;$("#sccam",el).textContent="Use camera";return}
-    vid.hidden=false;
+    if(!vid.hidden){stopCamera();vid.hidden=true;$("#schint",el).hidden=true;$("#sccam",el).textContent="Use camera";return}
+    vid.hidden=false;$("#schint",el).hidden=false;
     const ok=await startCamera(vid,add);
     if(ok)$("#sccam",el).textContent="Stop camera";else vid.hidden=true;
   });
@@ -1012,13 +1062,14 @@ function cardModal(id,carry){
   const recvHTML=dsp==="traded"&&c?'<p class="hint">'+(recv.length?"Received in this trade: "+recv.map(x=>esc(x.desc||("cert "+x.cert))).join(", "):"No received cards added yet.")+'</p><button type="button" class="btn sec sm" id="addrecv">Add received card</button>':'<p class="hint" id="recvhint">'+(c?"":"Save this card first, then add the cards you received.")+'</p><button type="button" class="btn sec sm" id="addrecv" style="display:'+(c?"inline-block":"none")+'">Add received card</button>';
   const sel=v=>dsp===v?" selected":"";
   const el=modal("<h2>"+(c?"Edit card":"Add card")+'</h2>'+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
-    field("PSA cert # (type, use a scanner, or tap Scan)",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button><button type="button" class="btn sec" id="psab">PSA</button></div><video id="cv" class="video" playsinline muted hidden></video><div class="psast" id="psast"></div>')+
+    field("PSA cert # (type, use a scanner, or tap Scan)",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button><button type="button" class="btn sec" id="psab">PSA</button></div><video id="cv" class="video" playsinline muted hidden></video><div id="camopts" class="hint" hidden>Hold the barcode about 4 to 6 inches away and keep it still. <button class="linkbtn" id="certphb" type="button">Take a photo instead</button></div><input type="file" id="certph" accept="image/*" capture="environment" hidden><div class="psast" id="psast"></div>')+
     field("Date purchased",'<input type="date" name="date" value="'+esc(d.date)+'">')+
     field("Description",'<input name="desc" placeholder="2023 Charizard ex PSA 10" value="'+esc(d.desc)+'">')+
     '<div class="two"><div>'+field("Owner",'<select name="owner">'+owners.map(o=>"<option"+(o===d.owner?" selected":"")+">"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+esc(d.pct)+'">')+"</div></div>"+
     field("Market value ($)",'<input name="mv" type="number" step="0.01" inputmode="decimal" value="'+esc(d.mv)+'">')+
     '<div class="preview" id="pv"></div>'+
-    field("Status",'<select name="disp"><option value="stock"'+sel("stock")+'>In stock</option><option value="sold"'+sel("sold")+'>Sold for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
+    (state.hasRepack?field("Triumph",'<select name="repack"><option value="">Not sent to Triumph</option>'+["pending","accepted","rejected"].map(k=>'<option value="'+k+'"'+(d.repack===k?" selected":"")+">"+REPACK[k]+(k==="accepted"?" (technically sold)":"")+"</option>").join("")+"</select>"):"")+
+    field("Status",'<select name="disp"><option value="stock"'+sel("stock")+'>Not sold to a customer</option><option value="sold"'+sel("sold")+'>Sold to a customer for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
     '<div id="outbox" style="display:'+(dsp==="stock"?"none":"block")+'">'+
       '<div id="soldf" style="display:'+(dsp==="sold"?"block":"none")+'"><div class="two"><div>'+field("Sale price ($)",'<input name="soldPrice" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="sold"?d.soldPrice:"")+'">')+"</div><div>"+field("% of market value",'<input name="soldPctMk" type="number" step="0.1" inputmode="decimal" value="'+esc(pctMk)+'">')+'</div></div><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-pp="'+q+'">'+q+'%</button>').join("")+"</div></div>"+
       '<div id="tradef" style="display:'+(dsp==="traded"?"block":"none")+'"><div class="two"><div>'+field("Trade value of this card ($)",'<input name="tradeValue" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="traded"?d.soldPrice:"")+'">')+"</div><div>"+field("Cash we received ($)",'<input name="tradeCash" type="number" step="0.01" inputmode="decimal" value="'+esc(d.tradeCash)+'">')+"</div></div>"+recvHTML+"</div>"+
@@ -1043,13 +1094,18 @@ function cardModal(id,carry){
     let n=0;if(r.blobs.length&&!(c&&attachN(c.id))){await ph.add(r.blobs,true);n=r.blobs.length}
     st.className="psast ok";st.textContent="Found: "+r.title+(r.pop?" | Pop "+r.pop:"")+(n?" | "+n+" PSA photo"+(n>1?"s":"")+" added, saved when you tap Save":"");
   });
+  const camOff=()=>{stopCamera();$("#cv",el).hidden=true;$("#camopts",el).hidden=true};
+  const gotCert=c=>{f.cert.value=c;camOff();beep(true);if(state.hasRepack!==undefined&&!f.desc.value.trim())f.desc.focus()};
   $("#certcam",el).addEventListener("click",async()=>{
     const v=$("#cv",el);
-    if(!v.hidden){stopCamera();v.hidden=true;return}
-    v.hidden=false;
-    const ok=await startCamera(v,t=>{f.cert.value=normalizeCert(t);stopCamera();v.hidden=true;beep(true);f.desc.focus()});
+    if(!v.hidden){camOff();return}
+    v.hidden=false;$("#camopts",el).hidden=false;
+    const ok=await startCamera(v,t=>gotCert(normalizeCert(t)));
     if(!ok)v.hidden=true;
   });
+  const certph=$("#certph",el);
+  $("#certphb",el).addEventListener("click",()=>{camOff();certph.value="";certph.click()});
+  certph.addEventListener("change",async()=>{const file=certph.files[0];if(!file)return;const st=$("#psast",el);st.className="psast";st.textContent="Reading barcode...";const c=await readBarcodeFromImage(file);if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c}else{beep(false);st.className="psast err";st.textContent="No barcode found in that photo. Get closer to the label, or type the number."}});
   const cashNow=()=>f.disp.value==="sold"?(+f.soldPrice.value||0):f.disp.value==="traded"?(+f.tradeCash.value||0):0;
   const pv=()=>{$("#pv",el).textContent="Payout: "+money(payoutOf({mv:f.mv.value,pct:f.pct.value}))};
   const spv=()=>{
@@ -1080,7 +1136,7 @@ function cardModal(id,carry){
   const commit=async()=>{
     const v=f.disp.value,isOut=v!=="stock";
     const price=v==="sold"?f.soldPrice.value:v==="traded"?f.tradeValue.value:"";
-    const rec={date:f.date.value||todayISO(),cert:f.cert.value.trim(),desc:f.desc.value.trim(),owner:f.owner.value,mv:f.mv.value===""?"":+f.mv.value,pct:f.pct.value===""?state.settings.defaultPct:+f.pct.value,sold:isOut,saleType:isOut?v:"",soldPrice:price===""?"":+price,soldDate:isOut?f.soldDate.value:"",tradeCash:v==="traded"&&f.tradeCash.value!==""?+f.tradeCash.value:"",notes:f.notes.value.trim()};
+    const rec={date:f.date.value||todayISO(),cert:f.cert.value.trim(),desc:f.desc.value.trim(),owner:f.owner.value,mv:f.mv.value===""?"":+f.mv.value,pct:f.pct.value===""?state.settings.defaultPct:+f.pct.value,sold:isOut,saleType:isOut?v:"",soldPrice:price===""?"":+price,soldDate:isOut?f.soldDate.value:"",tradeCash:v==="traded"&&f.tradeCash.value!==""?+f.tradeCash.value:"",notes:f.notes.value.trim(),repack:f.repack?f.repack.value:(d.repack||""),repackDate:f.repack&&f.repack.value&&f.repack.value===d.repack?d.repackDate:""};
     let cardId=id;
     if(id){if(!await api(sb.from("cards").update(cardRow(rec)).eq("id",id)))return null}
     else{const r=await api(sb.from("cards").insert(Object.assign({week_id:w.id},cardRow(rec),d.fromCardId?{from_card_id:d.fromCardId}:{})).select("id").single());if(!r)return null;cardId=r.data.id}
@@ -1107,7 +1163,7 @@ function viewCardModal(id){
   const kv=(a,b)=>'<div class="kv"><span>'+esc(a)+"</span><span>"+b+"</span></div>";
   const from=c.fromCardId&&wk.cards.find(y=>y.id===c.fromCardId);
   const recv=wk.cards.filter(y=>y.fromCardId===c.id);
-  const el=modal("<h2>"+esc(c.desc||"(no description)")+"</h2>"+kv("Cert",esc(c.cert||"n/a"))+kv("Date purchased",fmtDate(c.date))+kv("Owner",esc(c.owner))+kv("Market value",money(+c.mv||0))+kv("Consignor rate",(+c.pct||0)+"% = "+money(payoutOf(c)))+
+  const el=modal("<h2>"+esc(c.desc||"(no description)")+"</h2>"+kv("Cert",esc(c.cert||"n/a"))+kv("Date purchased",fmtDate(c.date))+kv("Owner",esc(c.owner))+(c.repack?kv("Triumph",esc(REPACK[c.repack])+(c.repackDate?" ("+fmtDate(c.repackDate)+")":"")):"")+kv("Market value",money(+c.mv||0))+kv("Consignor rate",(+c.pct||0)+"% = "+money(payoutOf(c)))+
     (c.sold?kv(c.saleType==="traded"?"Traded":"Sold",fmtDate(c.soldDate))+kv(c.saleType==="traded"?"Trade value":"Sale price",money(+c.soldPrice||0)+((+c.mv>0&&c.soldPrice!=="")?" ("+round2(+c.soldPrice/+c.mv*100)+"% of market)":""))+kv("Cash received",money(cashIn(c))):"")+
     (from?kv("Received in trade for",esc(cardLabel(from))):"")+(recv.length?kv("Received in this trade",recv.map(y=>esc(y.desc||y.cert)).join(", ")):"")+(c.notes?kv("Notes",esc(c.notes)):"")+
     '<label>Photos</label><div class="thumbs" id="thumbs"></div><p class="hint">'+whoText(c)+'</p><div class="actions"><button class="btn sec" data-act="close-modal">Close</button></div>');
@@ -1262,6 +1318,68 @@ function passwordModal(){
 }
 
 // ---------- csv import ----------
+function importChooser(){
+  const el=modal('<h2>Import CSV</h2><div class="menu"><button class="mi" data-m="new" type="button">'+ic("plus")+'<span class="mt">New cards we got<small>Adds cards from a Triumph export or any list of certs</small></span><span class="chev">'+ic("open",18)+'</span></button><button class="mi" data-m="triumph" type="button">'+ic("check")+'<span class="mt">What Triumph accepted<small>Marks matching cards as accepted, pending or rejected. Adds nothing unless you choose to.</small></span><span class="chev">'+ic("open",18)+'</span></button></div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  el.addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(!b)return;
+    if(b.dataset.m==="triumph"&&!state.hasRepack){toast("Run upgrade-4.sql in Supabase first, then try again");return}
+    ui.importMode=b.dataset.m;closeModal();$("#csvin").value="";$("#csvin").click()});
+}
+function rowRepack(st,approved,hasCols){
+  st=String(st||"").toLowerCase();approved=String(approved||"").trim().toLowerCase();
+  if(/reject|declin|denied/.test(st))return "rejected";
+  if(/pend|review|waiting/.test(st))return "pending";
+  if(/accept|approv|sold|took|taken/.test(st)||approved==="yes")return "accepted";
+  if(approved==="no")return "pending";
+  return hasCols?"":"accepted";
+}
+async function importTriumphStatus(text){
+  const rows=parseCSV(text);if(rows.length<2){toast("That file looks empty");return}
+  const H=rows[0].map(h=>h.trim().toLowerCase()),g=(r,i)=>i>=0&&i<r.length?r[i]:"";
+  const ix=(...k)=>H.findIndex(h=>k.some(x=>h===x))>=0?H.findIndex(h=>k.some(x=>h===x)):H.findIndex(h=>k.some(x=>h.includes(x)));
+  const iC=ix("cert id","psa cert #","cert"),iS=ix("status"),iCS=H.indexOf("card status"),iA=H.indexOf("approved"),iM=ix("market value"),iR=ix("rate","consignor %"),iT=ix("card title","item description","description");
+  if(iC<0){toast("Could not find a cert column in that file");return}
+  const hasCols=iS>=0||iCS>=0||iA>=0;
+  const byCert=new Map(state.week.cards.filter(c=>c.cert&&!c.sold).map(c=>[c.cert,c]));
+  const seen=new Set(),changes=[],missing=[];let same=0,soldAlready=0;
+  rows.slice(1).forEach(r=>{
+    const cert=normalizeCert(g(r,iC));if(!cert||seen.has(cert))return;seen.add(cert);
+    const st=rowRepack(g(r,iS)+" "+g(r,iCS),g(r,iA),hasCols);if(!st)return;
+    const mv=iM>=0&&g(r,iM).trim()!==""?parseMoney(g(r,iM)):null,pct=iR>=0&&g(r,iR).trim()!==""?parseMoney(g(r,iR)):null;
+    const c=byCert.get(cert);
+    if(!c){if(state.week.cards.some(x=>x.cert===cert&&x.sold))soldAlready++;else missing.push({cert,st,mv,pct,desc:iT>=0?g(r,iT).trim():""});return}
+    const patch={};
+    if(c.repack!==st){patch.repack_status=st;patch.repack_date=todayISO()}
+    if(mv!=null&&round2(+c.mv||0)!==round2(mv))patch.market_value=mv;
+    if(pct!=null&&(+c.pct||0)!==pct)patch.consignor_pct=pct;
+    if(c.notes===PENDING_NOTE)patch.notes="";
+    if(Object.keys(patch).length)changes.push({c,patch,st});else same++;
+  });
+  const cnt=k=>changes.filter(x=>x.patch.repack_status===k).length;
+  const el=modal('<h2>What Triumph accepted</h2><div class="counts"><div><b>'+cnt("accepted")+'</b><span>newly accepted</span></div><div><b>'+cnt("pending")+'</b><span>pending</span></div><div><b>'+cnt("rejected")+'</b><span>rejected</span></div></div><p class="hint">'+(changes.length?changes.length+" card"+(changes.length>1?"s":"")+" in this week will be updated"+(changes.some(x=>x.patch.market_value!=null||x.patch.consignor_pct!=null)?" (some also get Triumph's market value or rate)":"")+".":"No changes needed.")+(same?" "+same+" already up to date.":"")+(soldAlready?" "+soldAlready+" already sold to customers, left alone.":"")+"</p>"+
+    (missing.length?'<label class="chk"><input type="checkbox" id="tiadd">Also add the '+missing.length+" cert"+(missing.length>1?"s":"")+" not in this week</label>":"")+
+    '<div class="actions"><button class="btn" id="tigo" type="button"'+(changes.length||missing.length?"":" disabled")+'>Update</button><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  $("#tigo",el).addEventListener("click",async()=>{
+    el.querySelectorAll("button").forEach(b=>b.disabled=true);$("#tigo",el).textContent="Updating...";
+    let ok=0;
+    for(let k=0;k<changes.length;k+=8){const rs=await Promise.all(changes.slice(k,k+8).map(x=>api(sb.from("cards").update(x.patch).eq("id",x.c.id))));ok+=rs.filter(Boolean).length}
+    let added=0;
+    if(missing.length&&$("#tiadd",el)&&$("#tiadd",el).checked){
+      const rowsNew=missing.map(m=>newCardRow({cert:m.cert,desc:m.desc,mv:m.mv==null?"":m.mv,pct:m.pct==null?state.settings.defaultPct:m.pct,repack:m.st,repackDate:todayISO()}));
+      for(let k=0;k<rowsNew.length;k+=300){if(await api(sb.from("cards").upsert(rowsNew.slice(k,k+300),{onConflict:"week_id,cert",ignoreDuplicates:true})))added+=Math.min(300,rowsNew.length-k)}
+    }
+    closeModal();await refreshRender();toast(ok+" updated"+(added?", "+added+" added":""));
+  });
+}
+function repackBulkModal(){
+  const ids=[...(ui.sel||[])];if(!ids.length){toast("Select at least one card");return}
+  const el=modal("<h2>Triumph status for "+plural(ids.length,"card")+'</h2><div class="menu">'+[["accepted","Accepted by Triumph","Technically sold. Triumph owes the payout."],["pending","Pending at Triumph","Sent, waiting for approval"],["rejected","Rejected by Triumph","Triumph did not take it"],["","Not sent to Triumph","Clear the status"]].map(o=>'<button class="mi" data-r="'+o[0]+'" type="button"><span class="badge '+(o[0]?"rp-"+o[0]:"ok")+'" style="flex:0 0 auto">'+(o[0]?"":"None")+'</span><span class="mt">'+o[1]+"<small>"+o[2]+"</small></span></button>").join("")+'</div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  el.querySelectorAll("[data-r]").forEach(b=>{b.querySelector(".badge").textContent=b.dataset.r?({accepted:"Accepted",pending:"Pending",rejected:"Rejected"})[b.dataset.r]:"None"});
+  el.addEventListener("click",async e=>{const b=e.target.closest("[data-r]");if(!b)return;const v=b.dataset.r;
+    el.querySelectorAll("button").forEach(x=>x.disabled=true);
+    for(let k=0;k<ids.length;k+=8)await Promise.all(ids.slice(k,k+8).map(id=>api(sb.from("cards").update({repack_status:v||null,repack_date:v?todayISO():null}).eq("id",id))));
+    ui.sel=null;closeModal();await refreshRender();toast(plural(ids.length,"card")+" set to "+(v?REPACK[v]:"Not sent to Triumph"));
+  });
+}
 const PENDING_NOTE="Pending Triumph approval";
 async function importCSVText(text){
   const rows=parseCSV(text);if(rows.length<2){toast("That file looks empty");return}
@@ -1285,25 +1403,27 @@ async function importCSVText(text){
       const co=g(r,iCo).trim(),gr=g(r,iG).trim();
       const tag=co&&gr?co+" "+gr:"";
       const desc=title+(tag&&!title.toUpperCase().includes(tag.toUpperCase())?" "+tag:"");
-      items.push({cert,desc,mv:parseMoney(g(r,iM)),pct:g(r,iR)!==""?parseMoney(g(r,iR)):state.settings.defaultPct,owner:pickOwner(g(r,iO)),pending:/pending/.test(st)||/^no$/i.test(g(r,iA).trim())});
+      const pending=/pending/.test(st)||/^no$/i.test(g(r,iA).trim());
+      items.push({cert,desc,mv:parseMoney(g(r,iM)),pct:g(r,iR)!==""?parseMoney(g(r,iR)):state.settings.defaultPct,owner:pickOwner(g(r,iO)),pending,repack:pending?"pending":/accept|approv/.test(st)?"accepted":""});
     });
     const fresh=items.filter(i=>!i.cert||!byCert.has(i.cert));
-    const upd=items.filter(i=>{const c=i.cert&&byCert.get(i.cert);return c&&(round2(+c.mv||0)!==round2(i.mv)||(+c.pct||0)!==i.pct||(c.notes===PENDING_NOTE&&!i.pending))});
+    const upd=items.filter(i=>{const c=i.cert&&byCert.get(i.cert);return c&&(round2(+c.mv||0)!==round2(i.mv)||(+c.pct||0)!==i.pct||(c.notes===PENDING_NOTE&&!i.pending)||(state.hasRepack&&!c.sold&&i.repack&&c.repack!==i.repack))});
     const pendNew=fresh.filter(i=>i.pending).length;
     let incl=true;
-    if(pendNew&&!confirm(pendNew+" new cards are still Pending approval on Triumph. Include them? OK = include (marked Pending), Cancel = skip them."))incl=false;
+    if(pendNew&&!confirm(pendNew+" new cards are still pending approval at Triumph. Include them? OK = include (marked Pending at Triumph), Cancel = skip them."))incl=false;
     const add=fresh.filter(i=>incl||!i.pending);
     if(!add.length&&!upd.length){toast("Nothing new. Everything in this file is already here.");return}
     if(!confirm("Triumph import: "+add.length+" new cards"+(upd.length?", "+upd.length+" existing cards get updated market value or rate":"")+(rejected?" ("+rejected+" rejected rows ignored)":"")+". Continue?"))return;
     toast("Importing...");
-    const rowsNew=add.map(i=>newCardRow({cert:i.cert,desc:i.desc,mv:i.mv,pct:i.pct,owner:i.owner,notes:i.pending?PENDING_NOTE:""}));
+    const rowsNew=add.map(i=>newCardRow({cert:i.cert,desc:i.desc,mv:i.mv,pct:i.pct,owner:i.owner,repack:state.hasRepack?i.repack:"",notes:i.pending&&!state.hasRepack?PENDING_NOTE:""}));
     for(let k=0;k<rowsNew.length;k+=300){
       if(!await api(sb.from("cards").upsert(rowsNew.slice(k,k+300),{onConflict:"week_id,cert",ignoreDuplicates:true})))return;
     }
     for(const i of upd){
       const c=byCert.get(i.cert);
       const patch={market_value:i.mv,consignor_pct:i.pct};
-      if(c.notes===PENDING_NOTE&&!i.pending)patch.notes="";
+      if(c.notes===PENDING_NOTE&&(!i.pending||state.hasRepack))patch.notes="";
+      if(state.hasRepack&&!c.sold&&i.repack&&c.repack!==i.repack){patch.repack_status=i.repack;patch.repack_date=todayISO()}
       if(!await api(sb.from("cards").update(patch).eq("id",c.id)))break;
     }
     await refreshRender();toast(add.length+" added"+(upd.length?", "+upd.length+" updated":""));
@@ -1378,7 +1498,8 @@ const actions={
   "view-card"(id){viewCardModal(id)},
   bulk(){bulkModal()},
   "scan-certs"(){scanModal()},
-  "import-csv"(){$("#csvin").value="";$("#csvin").click()},
+  "import-csv"(){importChooser()},
+  "sel-repack"(){repackBulkModal()},
   "add-entry"(id,t){entryModal(t.dataset.kind,null)},
   "edit-entry"(id,t){entryModal(t.dataset.kind,id)},
   "close-week"(){closeWeekModal()},
@@ -1421,7 +1542,7 @@ function startQuickSelect(id){
 document.addEventListener("click",e=>{if(lpSuppress&&e.target.closest("[data-act]")){lpSuppress=false;e.preventDefault();return}const t=e.target.closest("[data-act]");if(!t)return;const fn=actions[t.dataset.act];if(fn){e.preventDefault();fn(t.dataset.id,t,e)}});
 document.addEventListener("input",e=>{if(e.target.id==="q"){ui.q=e.target.value;paintList()}});
 document.addEventListener("change",e=>{const id=e.target.id;if(id==="sortsel"){ui.sort=e.target.value;try{localStorage.setItem("repack-ui",JSON.stringify({sort:ui.sort}))}catch(x){}render()}else if(id==="ownersel"){ui.owner=e.target.value;render()}});
-$("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importCSVText(String(r.result));r.readAsText(f)});
+$("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const mode=ui.importMode;const r=new FileReader();r.onload=()=>mode==="triumph"?importTriumphStatus(String(r.result)):importCSVText(String(r.result));r.readAsText(f)});
 document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document.hidden){try{pc&&pc.untrack()}catch(e){}lastTrack=""}else{softRefresh();if(pcStatus!=="SUBSCRIBED"||rtStatus!=="SUBSCRIBED")retryLive();trackMe(true)}});
 window.addEventListener("online",()=>{if(sb&&me)softRefresh()});
 
