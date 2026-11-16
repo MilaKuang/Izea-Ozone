@@ -1183,7 +1183,7 @@ function settingsModal(){
   const s=state.settings;
   const myM=memberOf(me.name),hasAv=!!(myM&&myM.avatar_path);
   const el=modal('<h2>Account</h2><div class="bigav">'+avatarHTML(me.name,64)+'<div><div style="font-weight:700;font-size:17px">'+esc(me.name)+'</div><div class="hint" style="margin:2px 0 8px">'+esc(me.email)+'</div><div style="display:flex;gap:6px"><button class="btn sec sm" id="avch" type="button">'+(hasAv?"Change photo":"Add photo")+"</button>"+(hasAv?'<button class="btn sec sm" id="avrm" type="button">Remove</button>':"")+'</div></div><input type="file" id="avin" accept="image/*" hidden></div><div class="toolbar"><button class="btn sec" data-act="change-pw">Change password</button><button class="btn sec" data-act="sign-out">Sign out</button></div><h2 style="margin-top:22px">Settings</h2><form id="sf"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>"<option value=\""+i+"\""+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div><div class="actions"><button class="btn" type="submit">Save settings</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>'+
-  '<h2 style="margin-top:22px">Backup</h2><p class="hint">Data lives in your shared database. This downloads a copy of everything as a file.</p><div class="toolbar"><button class="btn sec" data-act="backup">Export backup</button></div>');
+  '<h2 style="margin-top:22px">Backup</h2><p class="hint">App version 11</p><p class="hint">Data lives in your shared database. This downloads a copy of everything as a file.</p><div class="toolbar"><button class="btn sec" data-act="backup">Export backup</button></div>');
   hydrateThumbs(el);
   const avin=$("#avin",el);
   $("#avch",el).addEventListener("click",()=>{avin.value="";avin.click()});
@@ -1375,8 +1375,9 @@ window.addEventListener("online",()=>{if(sb&&me)softRefresh()});
 // ---------- full-screen height (iPhone home screen apps report a short height) ----------
 function fitShell(){
   let h=window.innerHeight;
-  if(navigator.standalone===true){
-    const port=window.matchMedia("(orientation: portrait)").matches;
+  const mm=q=>!!(window.matchMedia&&window.matchMedia(q).matches);
+  if(navigator.standalone===true||mm("(display-mode: standalone)")&&/iPhone|iPad|iPod/.test(navigator.userAgent)){
+    const port=window.matchMedia?mm("(orientation: portrait)"):innerHeight>=innerWidth;
     const full=port?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height);
     if(full>h&&full-h<=90)h=full;
   }
