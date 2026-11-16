@@ -455,7 +455,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=30;
+const APP_VERSION=31;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -775,15 +775,14 @@ function soldHero(cs){
   const withCost=sold.filter(c=>lc.has(c.id)),sales=round2(sum(sold,val)),cash=round2(sum(sold,cashIn));
   const cost=round2(sum(withCost,c=>lc.get(c.id))),profit=round2(sum(withCost,val)-cost);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),avg=smv>0?sum(so,val)/smv*100:null;
-  const mkt=round2(sum(cs,c=>c.mv));
-  const top='<span>Total market this week</span><b class="big">'+money(mkt)+'</b><small>All '+plural(cs.length,"slab")+", sold and unsold"+(withCost.length?" | profit on sold slabs with a cost "+money(profit):"")+"</small>";
-  return '<div class="hero">'+top+'<div class="hstats h4"><div><span>Sold</span><b>'+sold.length+'</b></div><div><span>Sales</span><b>'+money(sales)+'</b></div><div><span>Cash in</span><b>'+money(cash)+'</b></div><div><span>Avg % mkt</span><b>'+(avg==null?"n/a":avg.toFixed(1)+"%")+"</b></div></div></div>";
+  const top='<span>Total sales</span><b class="big">'+money(sales)+"</b>";
+  return '<div class="hero">'+top+'<div class="hstats h4"><div><span>Sold</span><b>'+sold.length+'</b></div><div><span>Avg % mkt</span><b>'+(avg==null?"n/a":avg.toFixed(1)+"%")+"</b></div></div></div>";
 }
 function cardsView(){
   const t=calc(state.week),P=state.settings.partners,cs=state.week.cards.filter(c=>!ui.owner||c.owner===ui.owner);
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
-  return (ui.filter==="sold"?soldHero(cs):'<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
+  return (ui.filter==="sold"?soldHero(cs):'<div class="hero">'+(ui.filter==="all"||!ui.filter?'<span>Total market this week</span><b class="big">'+money(round2(sum(cs,c=>c.mv)))+'</b><small>Unsold market value '+money(t.mv)+" | Payout due "+money(t.due)+"</small>":'<span>Unsold market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+"</small>")+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
   '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
