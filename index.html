@@ -302,6 +302,8 @@ body.shell .toast{position:absolute}
 html.kbopen .overlay:not(.fullscan){top:var(--vvt);bottom:auto;height:var(--vvh)}
 html.kbopen .overlay:not(.fullscan) .sheet{max-height:calc(var(--vvh) - 10px);padding-bottom:14px}
 html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-bottom:10px}
+.seg.wrap{flex-wrap:wrap}
+.seg.wrap button{flex:1 1 30%}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -431,7 +433,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=23;
+const APP_VERSION=24;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -486,7 +488,8 @@ function pcalc(w,p){
   const spent=round2(sum(w.spend.filter(x=>x.partner===p),x=>x.amount)-sum(w.spend.filter(x=>x.kind==="loan"&&x.to===p),x=>x.amount));
   const paid=sum(w.payouts.filter(x=>x.partner===p),x=>x.amount);
   const share=round2(calc(w).profit/Math.max(1,state.settings.partners.length));
-  return{spent,paid,share,owed:round2(spent+share),left:round2(spent+share-paid)};
+  // still owed = what they put in minus what they have been paid back; half the profit is added on top at payout
+  return{spent,paid,share,left:round2(spent-paid),atPayout:round2(spent-paid+share)};
 }
 const cardLabel=c=>(c.desc||"(no description)")+(c.cert?" | cert "+c.cert:"");
 const whoText=o=>{if(!o||!o.createdBy)return "";let s="Added by "+o.createdBy+" on "+fmtTime(o.createdAt);if(o.updatedAt&&o.updatedAt!==o.createdAt)s+=" | Last edited by "+o.updatedBy+" on "+fmtTime(o.updatedAt);return esc(s)};
@@ -527,8 +530,8 @@ const MONEY_HEAD=["Week","Type","Partner","Amount","Date","Note","Added By","Add
 const moneyRows=(w,label)=>[...w.spend.map(x=>[label,x.kind==="loan"?"Loan":"Spend",x.kind==="loan"?x.partner+" to "+x.to:x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
 function summaryRows(w,label){
   const t=calc(w);
-  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit (unsold slabs at consignor payout)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Profit share","Total owed","Paid out","Still owed"]];
-  state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.share,c.owed,c.paid,c.left])});
+  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit (unsold slabs at consignor payout)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Paid out","Still owed (spent - paid)","Half of expected profit","Expected at payout"]];
+  state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.paid,c.left,c.share,c.atPayout])});
   return rows;
 }
 const fileTag=()=>todayISO();
@@ -733,7 +736,7 @@ function cardsView(){
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
   return '<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>"+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
-  '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Sell many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
+  '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
   '<div class="minis"><select class="mini" id="sortsel" aria-label="Sort">'+opt("new","Newest first",ui.sort)+opt("value","Highest value",ui.sort)+opt("low","Lowest value",ui.sort)+opt("name","Name A-Z",ui.sort)+opt("age","Longest in stock",ui.sort)+'</select><select class="mini" id="ownersel" aria-label="Owner">'+opt("","All owners",ui.owner)+opt(P[0],P[0],ui.owner)+opt(P[1],P[1],ui.owner)+opt("Shared","Shared",ui.owner)+"</select></div>"+
@@ -771,7 +774,7 @@ function activityView(){
   (list.length?out+(list.length>=200?'<p class="hint">Showing the latest 200. Export CSV for everything.</p>':""):emptyBox("activity",scope==="week"?"Nothing yet this week. Tap All time to see earlier weeks.":"No activity yet."));
 }
 function partnerTiles(w){
-  return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),pct=c.owed>0?Math.min(100,Math.max(0,c.paid/c.owed*100)):0;return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Still owed</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk"><span>Spent</span><span>'+money(c.spent)+'</span><span>+ Half profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span>- Paid</span><span>'+money(c.paid)+"</span></div></div>"}).join("")+"</div>";
+  return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),pct=c.spent>0?Math.min(100,Math.max(0,c.paid/c.spent*100)):0;return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Still owed</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk"><span>Spent</span><span>'+money(c.spent)+'</span><span>- Paid</span><span>'+money(c.paid)+'</span><span>+ Half profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span><b>At payout</b></span><span><b>'+money(c.atPayout)+"</b></span></div></div>"}).join("")+"</div>";
 }
 // filter chips for the Money lists: by partner, plus loans for spend
 function moneyFilter(kind,list){
@@ -791,7 +794,7 @@ function tilesFor(t){
   return '<div class="hero"><span>Expected profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Unsold at payout '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="hsub">If every slab still in stock sells at its consignor payout</div>'+(t.spent>0&&t.spent>t.due+t.proceeds&&t.stockN+t.soldN>0?'<div class="hwarn">Spent is more than everything in the app is worth. If some slabs are not entered yet, add them and this will balance out.</div>':"")+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
-  return partnerTiles(w)+'<p class="hint">Each partner gets back what they spent plus half the profit. Payouts already made come off that.</p>';
+  return partnerTiles(w)+'<p class="hint">Still owed is what each partner spent minus what they have been paid so far. At payout each also gets half the profit.</p>';
 }
 function exportButtons(id){
   const b=(k,l)=>'<button class="qbtn" data-act="exp" data-kind="'+k+'" data-id="'+id+'">'+ic("download")+l+"</button>";
@@ -1485,7 +1488,7 @@ function entryModal(kind,id){
   const w=state.week,list=w[kind],x=id?list.find(e=>e.id===id):null;
   if(id&&!x){toast("That entry was changed or removed");return}
   const d=x||{partner:state.settings.partners[0],amount:"",date:todayISO(),note:""};
-  const nm=kind==="spend"?"spend (a buy)":"payout",P=state.settings.partners,canLoan=kind==="spend"&&state.hasLoan,isLoan=canLoan&&d.kind==="loan";
+  const nm=kind==="spend"?"spend (a buy)":"payout",P=state.settings.partners,canLoan=false,isLoan=canLoan&&d.kind==="loan";
   const loanHTML=canLoan?field("Type",'<div class="seg" data-for="ekind"><button type="button" data-v="buy">Buy</button><button type="button" data-v="loan">Loan to partner</button></div><select name="ekind" class="hidesel"><option value="buy"'+(isLoan?"":" selected")+'>buy</option><option value="loan"'+(isLoan?" selected":"")+">loan</option></select>"):"";
   const toHTML=canLoan?'<div id="loanto"'+(isLoan?"":" hidden")+">"+field("Lent to",'<select name="to">'+P.map(p=>"<option"+(p===(d.to||P.find(q=>q!==d.partner))?" selected":"")+">"+esc(p)+"</option>").join("")+"</select>")+'<p class="hint">A loan is not spend. It moves that amount from the borrower\'s balance to the lender\'s, so the lender gets it back at payout.</p></div>':"";
   const el=modal("<h2>"+(x?"Edit ":"Add ")+nm+'</h2><form id="ef">'+loanHTML+field('<span id="plbl">'+(isLoan?"Lent by":"Partner")+"</span>",'<select name="partner">'+(kind==="payouts"&&!x?'<option value="__both" selected>Both, split 50/50</option>':"")+state.settings.partners.map(p=>"<option"+(x&&p===d.partner?" selected":"")+">"+esc(p)+"</option>").join("")+"</select>")+(kind==="payouts"&&!x?'<p class="hint" id="bothhint">Enter the total you are paying out. Each partner gets half.</p>':"")+toHTML+
@@ -1521,7 +1524,50 @@ function entryModal(kind,id){
 }
 function selBar(){
   const all=state.week.cards.filter(c=>ui.sel.has(c.id)),cs=all.filter(c=>!c.sold);
-  return '<div class="selbar"><div><b>'+all.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sm" data-act="sel-sell"'+(cs.length?"":" disabled")+'>Sell at %</button><button class="btn sec sm" data-act="sel-del" aria-label="Delete selected"'+(all.length?"":" disabled")+' style="padding:6px 9px">'+ic("trash",18)+'</button><button class="btn sec sm" data-act="sel-cancel" aria-label="Done selecting" style="padding:6px 9px">'+ic("plus",18).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+"</button></div></div>";
+  return '<div class="selbar"><div><b>'+all.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sm" data-act="sel-edit"'+(all.length?"":" disabled")+'>'+ic("edit",16)+'Edit</button><button class="btn sec sm" data-act="sel-del" aria-label="Delete selected"'+(all.length?"":" disabled")+' style="padding:6px 9px">'+ic("trash",18)+'</button><button class="btn sec sm" data-act="sel-cancel" aria-label="Done selecting" style="padding:6px 9px">'+ic("plus",18).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+"</button></div></div>";
+}
+// edit many cards at once: sold or not, sale %, repacker status, consignor %, owner. Blank means leave as is.
+function bulkEditModal(){
+  const P=state.settings.partners,cards=state.week.cards.filter(c=>ui.sel&&ui.sel.has(c.id));
+  if(!cards.length){toast("Select at least one card");return}
+  const reps=state.settings.repackers,totMv=sum(cards,c=>c.mv);
+  const seg=(name,opts)=>'<div class="seg'+(opts.length>3?" wrap":"")+'" data-for="'+name+'">'+opts.map(o=>'<button type="button" data-v="'+esc(o[0])+'" data-h="'+esc(o[2]||"")+'">'+esc(o[1])+"</button>").join("")+'</div><div class="seghint"></div><select name="'+name+'" class="hidesel">'+opts.map(o=>'<option value="'+esc(o[0])+'">'+esc(o[1])+"</option>").join("")+"</select>";
+  const el=modal("<h2>Edit "+plural(cards.length,"card")+'</h2><p class="hint">Market value of these cards: <b>'+money(totMv)+"</b>. Anything left on No change stays as it is.</p><form id=\"bef\">"+
+    '<div class="sech"><h3>Sold</h3></div><div class="formbox">'+seg("sold",[["","No change","Leave sold and unsold as they are."],["no","Not sold","Marks them back in stock and clears the sale."],["yes","Sold","Sold to a customer at a % of market."]])+
+    '<div id="besale" hidden><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-bp="'+q+'">'+q+"%</button>").join("")+'</div><div class="two"><div>'+field("Sold at % of market",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="90">')+"</div><div>"+field("Or total for the lot ($)",'<input name="total" type="number" step="0.01" inputmode="decimal">')+'</div></div><div class="preview" id="besum"></div>'+field("Sold date",'<input type="date" name="date" value="'+todayISO()+'">')+"</div></div>"+
+    (state.hasRepack?'<div class="sech"><h3>Repacker status</h3></div><div class="formbox">'+seg("repack",[["*","No change","Leave as is."],["","Not sent","Clear the status."],["pending","Pending","Sent, waiting for approval."],["accepted","Accepted","Technically sold. The repacker owes the payout."],["rejected","Rejected","The repacker did not take it."]])+(state.hasRepacker?'<div id="bewho" hidden>'+field("Which repacker",seg("repacker",reps.map(n=>[n,n,""])))+"</div>":"")+"</div>":"")+
+    '<div class="sech"><h3>Value</h3></div><div class="formbox"><div class="two"><div>'+field("Consignor %",'<input name="cpct" type="number" step="0.1" inputmode="decimal" placeholder="No change">')+"</div><div>"+field("Owner",'<select name="owner"><option value="">No change</option>'+["Shared",...P].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div></div></div>"+
+    '<div class="actions stick"><button class="btn" type="submit">Apply to '+plural(cards.length,"card")+'</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
+  const f=$("#bef",el);f.repack&&(f.repack.value="*");wireSeg(el);
+  const plan=()=>{
+    const tin=f.total.value!==""?+f.total.value:null,pct=+f.pct.value||0;let prices;
+    if(tin!=null){const ws=totMv;prices=cards.map(c=>round2(ws>0?tin*(+c.mv||0)/ws:tin/cards.length));prices[prices.length-1]=round2(prices[prices.length-1]+round2(tin-prices.reduce((a,b)=>a+b,0)))}
+    else prices=cards.map(c=>round2((+c.mv||0)*pct/100));
+    const total=round2(prices.reduce((a,b)=>a+b,0));return{prices,total,eff:totMv>0?round2(total/totMv*100):null};
+  };
+  const paint=()=>{$("#besale",el).hidden=f.sold.value!=="yes";const r=plan();$("#besum",el).textContent="Total "+money(r.total)+(r.eff!=null?" ("+r.eff+"% of market)":"");if($("#bewho",el))$("#bewho",el).hidden=!f.repack||f.repack.value==="*"||f.repack.value===""};
+  f.sold.addEventListener("change",paint);if(f.repack)f.repack.addEventListener("change",paint);
+  f.pct.addEventListener("input",()=>{f.total.value="";paint()});
+  f.total.addEventListener("input",()=>{const r=plan();if(f.total.value!==""&&r.eff!=null)f.pct.value=r.eff;paint()});
+  el.querySelectorAll("[data-bp]").forEach(b=>b.addEventListener("click",()=>{f.total.value="";f.pct.value=b.dataset.bp;paint()}));
+  paint();
+  f.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const soldV=f.sold.value,rp=f.repack?f.repack.value:"*",cp=f.cpct.value,ow=f.owner.value,r=plan(),date=f.date.value||todayISO();
+    if(!soldV&&rp==="*"&&cp===""&&!ow){toast("Nothing to change");return}
+    if(soldV==="yes"&&!(r.total>0)&&!confirm("The total is $0. Mark these cards sold anyway?"))return;
+    busy(f,true);let ok=true;
+    const patchFor=(c,i)=>{const pt={};
+      if(soldV==="yes"){pt.sold=true;pt.sale_type="sold";pt.sold_price=r.prices[i];pt.sold_date=date;pt.trade_cash=null}
+      if(soldV==="no"){pt.sold=false;pt.sale_type=null;pt.sold_price=null;pt.sold_date=null;pt.trade_cash=null}
+      if(rp!=="*"&&state.hasRepack){pt.repack_status=rp||null;pt.repack_date=rp?todayISO():null;if(state.hasRepacker)pt.repacker=rp?(f.repacker.value||reps[0]):null}
+      if(cp!=="")pt.consignor_pct=+cp;if(ow)pt.owner=ow;return pt};
+    for(let i=0;i<cards.length&&ok;i+=8){
+      const rs=await Promise.all(cards.slice(i,i+8).map((c,j)=>api(sb.from("cards").update(patchFor(c,i+j)).eq("id",c.id))));
+      if(rs.some(x=>!x))ok=false;
+    }
+    ui.sel=null;closeModal();await refreshRender();toast(ok?"Updated "+plural(cards.length,"card"):"Some cards could not be updated");
+  });
 }
 function bulkDeleteModal(){
   const ids=[...(ui.sel||[])].filter(id=>state.week.cards.some(c=>c.id===id));if(!ids.length){toast("Select at least one card");return}
@@ -1531,55 +1577,6 @@ function bulkDeleteModal(){
     el.querySelectorAll("button").forEach(b=>b.disabled=true);let ok=0;
     for(let k=0;k<ids.length;k+=8){const rs=await Promise.all(ids.slice(k,k+8).map(id=>api(sb.from("cards").delete().eq("id",id))));ok+=rs.filter(Boolean).length}
     removeFiles(paths);ui.sel=null;closeModal();await refreshRender();toast(plural(ok,"card")+" deleted");
-  });
-}
-function bulkSellModal(){
-  const P=state.settings.partners;
-  const cards=state.week.cards.filter(c=>ui.sel&&ui.sel.has(c.id)&&!c.sold);
-  if(!cards.length){toast("Select at least one in-stock card");return}
-  const totMv=sum(cards,c=>c.mv),noMv=cards.filter(c=>!(+c.mv>0)).length;
-  const el=modal("<h2>Sell "+cards.length+" cards</h2><p class=\"hint\">Market value of these cards: <b>"+money(totMv)+"</b>"+(noMv?" | "+noMv+" have no market value":"")+'</p><form id="bsf"><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-bp="'+q+'">'+q+'%</button>').join("")+'</div>'+
-    '<div class="two"><div>'+field("Sold at % of market",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="90">')+"</div><div>"+field("Or total price for the lot ($)",'<input name="total" type="number" step="0.01" inputmode="decimal">')+'</div></div><div class="preview" id="bsum"></div>'+
-    field("Sold date",'<input type="date" name="date" value="'+todayISO()+'">')+
-    '<p class="hint">Payouts are not added automatically. Add them on the Money tab when you actually get paid.</p>'+
-    '<div class="actions"><button class="btn" type="submit">Mark sold</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
-  const f=$("#bsf",el);
-  const plan=()=>{
-    const tin=f.total.value!==""?+f.total.value:null,pct=+f.pct.value||0;
-    let prices;
-    if(tin!=null){
-      const wts=cards.map(c=>+c.mv||0),ws=wts.reduce((a,b)=>a+b,0);
-      prices=cards.map((c,i)=>round2(ws>0?tin*wts[i]/ws:tin/cards.length));
-      prices[prices.length-1]=round2(prices[prices.length-1]+round2(tin-prices.reduce((a,b)=>a+b,0)));
-    }else prices=cards.map(c=>round2((+c.mv||0)*pct/100));
-    const total=round2(prices.reduce((a,b)=>a+b,0)),sp=50;
-    let a0=0;cards.forEach((c,i)=>{a0+=prices[i]*(c.owner===P[0]?1:c.owner===P[1]?0:sp/100)});
-    a0=round2(a0);
-    return{prices,total,a0,a1:round2(total-a0),eff:totMv>0?round2(total/totMv*100):null};
-  };
-  const paint=()=>{const r=plan();$("#bsum",el).textContent="Total "+money(r.total)+(r.eff!=null?" ("+r.eff+"% of market)":"")};
-  f.pct.addEventListener("input",()=>{f.total.value="";paint()});
-  f.total.addEventListener("input",()=>{const r=plan();if(f.total.value!==""&&r.eff!=null)f.pct.value=r.eff;paint()});
-  el.querySelectorAll("[data-bp]").forEach(b=>b.addEventListener("click",()=>{f.total.value="";f.pct.value=b.dataset.bp;paint()}));
-  paint();
-  f.addEventListener("submit",async e=>{
-    e.preventDefault();
-    const r=plan(),date=f.date.value||todayISO(),rec=false;
-    if(!(r.total>0)&&!confirm("The total is $0. Mark these cards sold anyway?"))return;
-    busy(f,true);
-    let ok=true;
-    for(let i=0;i<cards.length&&ok;i+=8){
-      const rs=await Promise.all(cards.slice(i,i+8).map((c,j)=>api(sb.from("cards").update({sold:true,sale_type:"sold",sold_price:r.prices[i+j],sold_date:date}).eq("id",c.id))));
-      if(rs.some(x=>!x))ok=false;
-    }
-    if(ok&&rec&&r.total>0){
-      const rows=[[P[0],r.a0],[P[1],r.a1]].filter(x=>x[1]>0).map(([pn,a])=>({week_id:state.week.id,partner:pn,amount:a,entry_date:date,note:"Bulk sale: "+cards.length+" cards"+(r.eff!=null?" at "+r.eff+"% of market":"")}));
-      if(rows.length&&await api(sb.from("payouts").insert(rows))){
-        for(let i=0;i<cards.length;i+=8)await Promise.all(cards.slice(i,i+8).map(c=>api(sb.from("cards").update({split_done:true}).eq("id",c.id))));
-      }
-    }
-    ui.sel=null;closeModal();await refreshRender();
-    toast(ok?cards.length+" cards sold for "+money(r.total):"Some cards could not be updated. Check the list.");
   });
 }
 function closeWeekModal(){
@@ -1823,8 +1820,8 @@ function doExportAll(kind){
   else if(kind==="money")exportFile("repack-all-money-"+fileTag()+".csv",toCSV([MONEY_HEAD,...weeks.flatMap(x=>moneyRows(x.w,x.label))]));
   else{
     const P=state.settings.partners;
-    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Expected profit","Rate %",...P.flatMap(p=>[p+" spent",p+" profit share",p+" paid",p+" still owed"])];
-    const rows=weeks.map(x=>{const t=calc(x.w);return [x.label,fmtDate(x.w.start),x.w.end?fmtDate(x.w.end):"",t.stockN,t.soldN,t.mv,t.due,t.proceeds,t.spent,t.paid,t.profit,t.rate==null?"":round2(t.rate),...P.flatMap(p=>{const c=pcalc(x.w,p);return [c.spent,c.share,c.paid,c.left]})]});
+    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Expected profit","Rate %",...P.flatMap(p=>[p+" spent",p+" paid",p+" still owed",p+" half profit",p+" at payout"])];
+    const rows=weeks.map(x=>{const t=calc(x.w);return [x.label,fmtDate(x.w.start),x.w.end?fmtDate(x.w.end):"",t.stockN,t.soldN,t.mv,t.due,t.proceeds,t.spent,t.paid,t.profit,t.rate==null?"":round2(t.rate),...P.flatMap(p=>{const c=pcalc(x.w,p);return [c.spent,c.paid,c.left,c.share,c.atPayout]})]});
     exportFile("repack-weekly-totals-"+fileTag()+".csv",toCSV([head,...rows]));
   }
 }
@@ -1838,7 +1835,8 @@ function backup(){exportFile("repack-backup-"+fileTag()+".json",JSON.stringify({
 // ---------- actions ----------
 const actions={
   tab(id){ui.tab=id;ui.hist=null;ui.sel=null;ui.top=true;render()},
-  "sel-mode"(){ui.sel=new Set();ui.filter="stock";render()},
+  "sel-mode"(){ui.sel=new Set();render()},
+  "sel-edit"(){bulkEditModal()},
   "sel-cancel"(){ui.sel=null;render()},
   "money-f"(id,b){ui.mf=ui.mf||{};ui.mf[b.dataset.kind]=id||"";render()},
   "toggle-sel"(id,row){const c=state.week.cards.find(x=>x.id===id);if(!c||!ui.sel)return;if(ui.sel.has(id))ui.sel.delete(id);else ui.sel.add(id);
@@ -1849,7 +1847,6 @@ const actions={
     const tmp=document.createElement("div");tmp.innerHTML=selBar();bar.innerHTML=tmp.firstChild.innerHTML},
   "sel-all"(){filteredCards().forEach(c=>ui.sel.add(c.id));render()},
   "sel-del"(){bulkDeleteModal()},
-  "sel-sell"(){bulkSellModal()},
   who(){whoModal()},
   "psa-fill"(){psaFillModal()},
   back(){ui.hist=null;render()},
