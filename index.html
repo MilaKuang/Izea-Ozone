@@ -455,7 +455,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=29;
+const APP_VERSION=30;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -775,7 +775,8 @@ function soldHero(cs){
   const withCost=sold.filter(c=>lc.has(c.id)),sales=round2(sum(sold,val)),cash=round2(sum(sold,cashIn));
   const cost=round2(sum(withCost,c=>lc.get(c.id))),profit=round2(sum(withCost,val)-cost);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),avg=smv>0?sum(so,val)/smv*100:null;
-  const top=withCost.length?'<span>Profit on sold slabs</span><b class="big'+(profit<0?" neg":"")+'">'+money(profit)+'</b><small>Sales '+money(round2(sum(withCost,val)))+" - cost "+money(cost)+(withCost.length<sold.length?" | "+(sold.length-withCost.length)+" sold "+(sold.length-withCost.length===1?"slab has":"slabs have")+" no cost yet":"")+"</small>":'<span>Sales</span><b class="big">'+money(sales)+"</b><small>"+(state.hasCost&&sold.length?"Link sold slabs to their buy to see profit":"Profit this week "+money(calc(state.week).profit)+" (all slabs, unsold at payout)")+"</small>";
+  const mkt=round2(sum(cs,c=>c.mv));
+  const top='<span>Total market this week</span><b class="big">'+money(mkt)+'</b><small>All '+plural(cs.length,"slab")+", sold and unsold"+(withCost.length?" | profit on sold slabs with a cost "+money(profit):"")+"</small>";
   return '<div class="hero">'+top+'<div class="hstats h4"><div><span>Sold</span><b>'+sold.length+'</b></div><div><span>Sales</span><b>'+money(sales)+'</b></div><div><span>Cash in</span><b>'+money(cash)+'</b></div><div><span>Avg % mkt</span><b>'+(avg==null?"n/a":avg.toFixed(1)+"%")+"</b></div></div></div>";
 }
 function cardsView(){
@@ -846,7 +847,7 @@ function profitPair(w){
 }
 function moneyView(){
   const w=state.week;
-  return profitPair(w)+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
+  return partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
   '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+moneyFilter("payouts",w.payouts);
 }
 function tilesFor(t){
