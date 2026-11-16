@@ -415,7 +415,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=20;
+const APP_VERSION=21;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -990,7 +990,7 @@ function scanModal(){
     pending.delete(cert);
     if(!r){beep(false);return}
     const item={cert,id:r.data&&r.data.id,owner:own.value,title:desc||"",st:"saved",fresh:true};
-    session.unshift(item);ui.dirty=true;beep(true);hit();flash("Added "+cert,"ok");paint();
+    session.unshift(item);ui.dirty=true;beep(true);hit();flash(desc||!ocrBox.checked?"Added "+cert:"Added "+cert+". No name read, scan the front label to add it.","ok");paint();
     if(psaBox.checked&&item.id)enrich(item);
   };
   const remove=async cert=>{
@@ -1081,6 +1081,8 @@ function ocrReady(){
   return ocrP;
 }
 const GRADE_WORDS=["GEM MT","GEM MINT","NM-MT","NM MT","EX-MT","VG-EX","MINT","AUTHENTIC","NM","EX","VG","GOOD","FAIR","POOR"];
+const GRADE_NUM={"GEM MT":"10","GEM MINT":"10","NM-MT":"8","NM MT":"8","EX-MT":"6","VG-EX":"4","MINT":"9","NM":"7","EX":"5","VG":"3","GOOD":"2","FAIR":"1.5","POOR":"1"};
+const YEAR_RE=/(^|\s)(19[89]\d|20[0-4]\d)(?=\s|$|-)/;
 function parseLabel(raw){
   const lines=String(raw||"").split(/\n+/).map(l=>l.replace(/[^A-Za-z0-9#&'.\-\/ ]+/g," ").replace(/\s+/g," ").trim()).filter(l=>l.length>=2||/^\d$/.test(l));
   const all=lines.join(" "),U=all.toUpperCase();
@@ -1089,28 +1091,42 @@ function parseLabel(raw){
   let gw="",gn="";
   for(const w of GRADE_WORDS){const re=new RegExp("(^|\\s)"+w.replace(/[-\s]/g,"[-\\s]?")+"(?=\\s|$)(\\s+(10|[1-9](\\.5)?))?");const m=U.match(re);if(m&&!(w==="EX"&&/\bEX\b/.test(all)&&!/\bEX\s+(10|[1-9])\b/.test(U))){gw=w;gn=m[3]||"";break}}
   if(!gn){const solo=lines.filter(l=>/^(10|[1-9](\.5)?)$/.test(l));if(solo.length)gn=solo[solo.length-1];else if(gw){const m=lines.map(l=>l.match(/(?:^|\s)(10|[1-9](?:\.5)?)$/)).filter(Boolean);if(m.length)gn=m[m.length-1][1]}}
+  // the grade word is printed bigger and reads more reliably than the number, so it wins
+  if(gw&&GRADE_NUM[gw]){const want=GRADE_NUM[gw];if(gn!==want&&!(gw==="MINT"&&gn==="9.5"))gn=want}
   const nm=all.match(/#\s?([A-Za-z0-9][A-Za-z0-9\-\/]{0,7})/);const num=nm?nm[1]:"";
+  // a PSA front label always starts with the year; no year means this is not the front label
+  const start=lines.findIndex(l=>YEAR_RE.test(l));
   const desc=[];
-  lines.forEach(l=>{
+  if(start>=0)lines.slice(start).some(l=>{
     let t=" "+l+" ";
+    const hasCert=cert&&t.includes(" "+cert+" ");
     if(cert)t=t.replace(new RegExp("\\s"+cert+"(?=\\s)","g")," ");
     if(nm)t=t.replace(/#\s?[A-Za-z0-9][A-Za-z0-9\-\/]{0,7}/g," ");
     if(gw)t=t.replace(new RegExp("\\s"+gw.replace(/[-\s]/g,"[-\\s]?")+"(?=\\s)","ig")," ");
     if(gn)t=t.replace(new RegExp("\\s"+gn.replace(".","\\.")+"\\s*$")," ");
+    if(!desc.length){const m=t.match(YEAR_RE);if(m)t=" "+t.slice(m.index+m[1].length)}
     if(/^\s*\d{1,2}(\.5)?\s*$/.test(t))t="";
     t=t.replace(/\s+/g," ").trim();
     const letters=(t.match(/[A-Za-z]/g)||[]).length;
     if(letters>=3&&letters/t.replace(/\s/g,"").length>0.5)desc.push(t);
+    return (hasCert&&desc.length>=3)||desc.length>=4;
   });
   let d=psaCase(desc.join(" "));
+  if(!/[A-Za-z]{3}/.test(d.replace(YEAR_RE,"")))d="";
   if(d&&num)d+=" #"+num;
   if(d&&gn)d+=" PSA "+gn;else if(d&&gw==="AUTHENTIC")d+=" PSA Authentic";
   return{cert,desc:d,grade:gn,num,raw:all};
 }
 async function ocrCanvas(cv){
   const w=await ocrReady();
-  const r=await w.recognize(cv);
-  return parseLabel(r&&r.data?r.data.text:"");
+  const r=await w.recognize(cv,{},{blocks:true,text:true});
+  const d=r&&r.data||{};
+  // keep only words the reader is sure about; glare, plastic and artwork come back as low-confidence junk
+  if(d.blocks&&d.blocks.length){
+    const out=[];d.blocks.forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>{const t=(l.words||[]).filter(x=>x.confidence>=65).map(x=>x.text).join(" ");if(t)out.push(t)})));
+    return parseLabel(out.join("\n"));
+  }
+  return parseLabel(d.text||"");
 }
 // crop the scan box out of a live video frame, scaled up so small label text reads well
 function guideCanvas(video,guide){
@@ -1135,7 +1151,7 @@ function ocrOn(){try{return localStorage.getItem("repack-ocr")!=="0"}catch(e){re
 const PSA_UP=new Set(["GX","EX","V","VMAX","VSTAR","IR","SIR","SAR","AR","UR","HR","CHR","TG","GG","PSA","SV","SWSH","XY","SM","BW","DX","CS","CBB","JP","EN","PR","LV.X","TAG","TEAM","BREAK","PRIME","MEGA"].map(x=>x.toUpperCase()));
 function psaCase(str){
   return String(str||"").trim().split(/\s+/).map(w=>w.split("-").map(p=>{
-    if(!p)return p;if(/\d/.test(p))return p;if(p===p.toLowerCase())return p;if(/\./.test(p)&&p.length<=5&&p===p.toUpperCase())return p;
+    if(!p)return p;if(p===p.toLowerCase())return p;if(/^\d+(ST|ND|RD|TH)$/i.test(p))return p.toLowerCase();if(/\d/.test(p))return p;if((p.match(/\./g)||[]).length>=2&&p.length<=6&&p===p.toUpperCase())return p;
     if(PSA_UP.has(p.toUpperCase())&&p.toUpperCase()!=="MEGA")return p.toUpperCase();return p.charAt(0).toUpperCase()+p.slice(1).toLowerCase();
   }).join("-")).join(" ");
 }
