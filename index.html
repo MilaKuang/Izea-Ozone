@@ -840,6 +840,7 @@ async function psaLookup(cert,images){
   return psaParse(d);
 }
 function psaParse(d){
+  if(d.error&&/approved customers/i.test(d.error))return{error:"PSA has not approved your account for its API yet. Email collectors-apis@collectors.com to ask for access. You can still check the cert on psacard.com.",setup:true};
   if(d.error)return{error:String(d.error)};
   if(!d.info)return{error:"PSA had no data for that cert"};
   const blobs=[];(d.images||[]).forEach(im=>{try{if(im&&im.data)blobs.push(b64Blob(im.data,im.type))}catch(e){}});
@@ -990,7 +991,7 @@ function cardModal(id,carry){
     if(!cert){toast("Enter or scan a cert number first");return}
     f2.cert.value=cert;st.className="psast";st.textContent="Looking up PSA cert "+cert+"...";$("#psab",el).disabled=true;
     const r=await psaLookup(cert,true);$("#psab",el).disabled=false;
-    if(r.error){st.className="psast err";st.textContent=r.error;return}
+    if(r.error){st.className="psast err";st.innerHTML=esc(r.error)+' <a href="https://www.psacard.com/cert/'+encodeURIComponent(cert)+'" target="_blank" rel="noopener">Open on psacard.com</a>';return}
     const cur=f2.desc.value.trim();
     if(r.title&&(!cur||cur===r.title||confirm("Replace the description with PSA's?\n\n"+r.title)))f2.desc.value=r.title;
     let n=0;if(r.blobs.length&&!(c&&attachN(c.id))){await ph.add(r.blobs,true);n=r.blobs.length}
