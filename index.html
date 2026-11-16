@@ -195,7 +195,10 @@ input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:10px;accent-co
 .selbar .btn.sec{background:rgba(255,255,255,.14);color:inherit}
 @media(prefers-color-scheme:dark){.selbar .btn.sec{background:rgba(0,0,0,.12)}}
 .selbtns{display:flex;gap:6px;flex:0 0 auto}
-body.shell{position:fixed;top:0;left:0;right:0;height:100vh;height:var(--apph,100dvh);overflow:hidden}
+html.shell{height:100vh;height:var(--apph,100dvh);overscroll-behavior:none}
+body.shell{height:100%;overflow:hidden;position:relative}
+body.shell .overlay,body.shell .lightbox{position:absolute;inset:0}
+body.shell .toast{position:absolute}
 #app.shell{height:100%;display:flex;flex-direction:column;padding-bottom:0}
 #app.shell header{position:relative;flex:0 0 auto;background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
 #scroller{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:2px 0 18px}
@@ -528,7 +531,7 @@ function dueBanner(){
   return '<div class="banner"><span>A new week has started. Close out the last one and reset?</span><button class="btn sm" data-act="close-week">Close week</button></div>';
 }
 function render(){
-  document.body.classList.remove("shell");$("#app").classList.remove("shell");
+  document.documentElement.classList.remove("shell");document.body.classList.remove("shell");$("#app").classList.remove("shell");
   if(!cfg()||!sb){renderSetup();return}
   if(ui.recovery){renderNewPassword();return}
   if(!me){renderLogin();return}
@@ -538,7 +541,7 @@ function render(){
   if(ui.hist){const h=state.history.find(x=>x.id===ui.hist);if(h){title=h.label;sub=fmtDate(h.start)+" - "+fmtDate(h.end);body=histDetail(h);back='<button class="icon" data-act="back" aria-label="Back">'+ic("back",18)+"</button>"}else ui.hist=null}
   if(!ui.hist){body={cards:cardsView,money:moneyView,summary:summaryView,history:historyView,activity:activityView}[ui.tab]()}
   const tabs=[["cards","Cards"],["money","Money"],["summary","Summary"],["history","History"],["activity","Activity"]];
-  document.body.classList.add("shell");$("#app").classList.add("shell");
+  document.documentElement.classList.add("shell");document.body.classList.add("shell");$("#app").classList.add("shell");
   $("#app").innerHTML='<header><div class="hl">'+(back||'<img class="logo" src="icon-192.png" alt="">')+'<div class="ht"><h1>'+esc(title)+"</h1><p>"+esc(sub)+'</p></div></div><div class="hr"><div id="presence">'+presenceHTML()+'</div><button class="avatar" data-act="settings" aria-label="Account and settings">'+avatarHTML(me.name,38)+"</button></div></header>"+
   '<div id="scroller">'+(ui.offline?'<div class="banner"><span>Offline. Showing the last saved data. Reconnect to make changes.</span></div>':"")+dueBanner()+"<main>"+body+"</main></div>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
   "<nav>"+tabs.map(t=>'<button data-act="tab" data-id="'+t[0]+'" class="'+(!ui.hist&&ui.tab===t[0]||ui.hist&&t[0]==="history"?"on":"")+'"><span class="nb">'+ic(t[0],22)+"</span>"+t[1]+"</button>").join("")+"</nav>";
@@ -1183,7 +1186,7 @@ function settingsModal(){
   const s=state.settings;
   const myM=memberOf(me.name),hasAv=!!(myM&&myM.avatar_path);
   const el=modal('<h2>Account</h2><div class="bigav">'+avatarHTML(me.name,64)+'<div><div style="font-weight:700;font-size:17px">'+esc(me.name)+'</div><div class="hint" style="margin:2px 0 8px">'+esc(me.email)+'</div><div style="display:flex;gap:6px"><button class="btn sec sm" id="avch" type="button">'+(hasAv?"Change photo":"Add photo")+"</button>"+(hasAv?'<button class="btn sec sm" id="avrm" type="button">Remove</button>':"")+'</div></div><input type="file" id="avin" accept="image/*" hidden></div><div class="toolbar"><button class="btn sec" data-act="change-pw">Change password</button><button class="btn sec" data-act="sign-out">Sign out</button></div><h2 style="margin-top:22px">Settings</h2><form id="sf"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>"<option value=\""+i+"\""+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div><div class="actions"><button class="btn" type="submit">Save settings</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>'+
-  '<h2 style="margin-top:22px">Backup</h2><p class="hint">App version 11</p><p class="hint">Data lives in your shared database. This downloads a copy of everything as a file.</p><div class="toolbar"><button class="btn sec" data-act="backup">Export backup</button></div>');
+  '<h2 style="margin-top:22px">Backup</h2><p class="hint">App version 12 | screen '+Math.round(screen.height)+" | view "+innerHeight+" | app "+Math.round(document.documentElement.getBoundingClientRect().height)+(navigator.standalone?" | home screen":"")+'</p><p class="hint">Data lives in your shared database. This downloads a copy of everything as a file.</p><div class="toolbar"><button class="btn sec" data-act="backup">Export backup</button></div>');
   hydrateThumbs(el);
   const avin=$("#avin",el);
   $("#avch",el).addEventListener("click",()=>{avin.value="";avin.click()});
@@ -1385,6 +1388,7 @@ function fitShell(){
 }
 fitShell();
 window.addEventListener("resize",fitShell);
+window.addEventListener("scroll",()=>{if(document.body.classList.contains("shell")&&(window.scrollY||window.pageYOffset))window.scrollTo(0,0)},{passive:true});
 window.addEventListener("orientationchange",()=>{setTimeout(fitShell,250);setTimeout(fitShell,700)});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)fitShell()});
 
