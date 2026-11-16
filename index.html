@@ -195,7 +195,7 @@ input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:10px;accent-co
 .selbar .btn.sec{background:rgba(255,255,255,.14);color:inherit}
 @media(prefers-color-scheme:dark){.selbar .btn.sec{background:rgba(0,0,0,.12)}}
 .selbtns{display:flex;gap:6px;flex:0 0 auto}
-body.shell{position:fixed;inset:0;overflow:hidden}
+body.shell{position:fixed;top:0;left:0;right:0;height:100vh;height:var(--apph,100dvh);overflow:hidden}
 #app.shell{height:100%;display:flex;flex-direction:column;padding-bottom:0}
 #app.shell header{position:relative;flex:0 0 auto;background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
 #scroller{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:2px 0 18px}
@@ -1371,6 +1371,21 @@ document.addEventListener("change",e=>{const id=e.target.id;if(id==="sortsel"){u
 $("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importCSVText(String(r.result));r.readAsText(f)});
 document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document.hidden){try{rt&&rt.untrack()}catch(e){}lastTrack=""}else{softRefresh();trackMe(true)}});
 window.addEventListener("online",()=>{if(sb&&me)softRefresh()});
+
+// ---------- full-screen height (iPhone home screen apps report a short height) ----------
+function fitShell(){
+  let h=window.innerHeight;
+  if(navigator.standalone===true){
+    const port=window.matchMedia("(orientation: portrait)").matches;
+    const full=port?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height);
+    if(full>h&&full-h<=90)h=full;
+  }
+  document.documentElement.style.setProperty("--apph",h+"px");
+}
+fitShell();
+window.addEventListener("resize",fitShell);
+window.addEventListener("orientationchange",()=>{setTimeout(fitShell,250);setTimeout(fitShell,700)});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)fitShell()});
 
 // ---------- boot ----------
 async function boot(){
