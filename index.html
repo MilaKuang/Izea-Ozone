@@ -304,6 +304,15 @@ html.kbopen .overlay:not(.fullscan) .sheet{max-height:calc(var(--vvh) - 10px);pa
 html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-bottom:10px}
 .seg.wrap{flex-wrap:wrap}
 .seg.wrap button{flex:1 1 30%}
+.lotlist{border:1px solid var(--line);border-radius:12px;max-height:30vh;overflow:auto}
+.lotrow{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px}
+.lotrow:last-child{border-bottom:0}
+.lotrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hstats.h4{grid-template-columns:repeat(2,1fr);row-gap:10px}
+.hstats.h4 b{font-size:17px}
+.profitbox{margin-bottom:12px}
+.pbtop{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.profitbox .big{font-size:26px}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -371,9 +380,9 @@ function cfg(){
 
 // ---------- row mapping ----------
 const num=v=>v==null?"":+v;
-const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,carried:!!r.carried,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repacker:r.repacker||(r.repack_status||r.notes==="Pending Triumph approval"?"Triumph":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
+const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,carried:!!r.carried,cost:num(r.cost),spendId:r.spend_id||null,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repacker:r.repacker||(r.repack_status||r.notes==="Pending Triumph approval"?"Triumph":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
 const mapEntry=r=>({id:r.id,partner:r.partner,amount:+r.amount,kind:r.kind||"buy",to:r.to_partner||"",date:r.entry_date||"",note:r.note||"",cardId:r.card_id,createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
-const cardRow=r=>{const o=cardRow0(r);if(state&&state.hasRepack){o.repack_status=r.repack||null;o.repack_date=r.repack?(r.repackDate||todayISO()):null}if(state&&state.hasRepacker)o.repacker=r.repack?(r.repacker||state.settings.repackers[0]):null;return o};
+const cardRow=r=>{const o=cardRow0(r);if(state&&state.hasRepack){o.repack_status=r.repack||null;o.repack_date=r.repack?(r.repackDate||todayISO()):null}if(state&&state.hasRepacker)o.repacker=r.repack?(r.repacker||state.settings.repackers[0]):null;if(state&&state.hasCost){o.cost=(r.cost===""||r.cost==null)?null:+r.cost;o.spend_id=r.spendId||null}return o};
 const cardRow0=r=>({date_purchased:r.date||null,cert:r.cert||null,description:r.desc||"",owner:r.owner,market_value:r.mv===""?null:+r.mv,consignor_pct:+r.pct,sold:!!r.sold,sale_type:r.sold?(r.saleType||"sold"):null,sold_price:(r.soldPrice===""||r.soldPrice==null)?null:+r.soldPrice,sold_date:r.soldDate||null,trade_cash:(r.sold&&r.saleType==="traded"&&r.tradeCash!==""&&r.tradeCash!=null)?+r.tradeCash:null,notes:r.notes||""});
 
 async function fetchAll(table,order){
@@ -406,7 +415,7 @@ async function loadAll(){
   if(!open)throw new Error("No open week found. Re-run setup.sql.");
   const history=wk.data.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
   const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
-  state={hasLoan:!!(lq&&!lq.error),hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
+  state={hasCost:false,hasLoan:!!(lq&&!lq.error),hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
   ui.offline=false;
   try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state}))}catch(e){}
 }
@@ -433,7 +442,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=24;
+const APP_VERSION=26;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -471,6 +480,21 @@ function teardown(){
 }
 
 // ---------- calc ----------
+// each slab's cost: a cost typed on the slab wins; otherwise its share of the buy (lot) it is linked to, split by market value
+const hasOwnCost=c=>c.cost!==""&&c.cost!=null;
+function lotCosts(w){
+  const out=new Map();
+  w.spend.forEach(b=>{
+    const inLot=w.cards.filter(c=>c.spendId===b.id);if(!inLot.length)return;
+    const open=inLot.filter(c=>!hasOwnCost(c));if(!open.length)return;
+    const rest=Math.max(0,(+b.amount||0)-sum(inLot.filter(hasOwnCost),c=>c.cost)),mvs=sum(open,c=>c.mv);
+    let left=round2(rest);open.forEach((c,i)=>{const v=i===open.length-1?left:round2(mvs>0?rest*(+c.mv||0)/mvs:rest/open.length);out.set(c.id,v);left=round2(left-v)});
+  });
+  w.cards.forEach(c=>{if(hasOwnCost(c))out.set(c.id,+c.cost)});
+  return out;
+}
+const lcCache=new WeakMap();
+const lotCostsOf=w=>{let m=lcCache.get(w);if(!m){m=lotCosts(w);lcCache.set(w,m)}return m};
 const payoutOf=c=>Math.round((+c.mv||0)*(+c.pct||0))/100;
 const cashIn=c=>c.saleType==="traded"?(+c.tradeCash||0):(+c.soldPrice||0);
 function calc(w){
@@ -487,9 +511,9 @@ function pcalc(w,p){
   // a loan between partners moves money from one to the other without counting as spend
   const spent=round2(sum(w.spend.filter(x=>x.partner===p),x=>x.amount)-sum(w.spend.filter(x=>x.kind==="loan"&&x.to===p),x=>x.amount));
   const paid=sum(w.payouts.filter(x=>x.partner===p),x=>x.amount);
+  // still owed = what they spent + half the week's profit - what they have already been paid
   const share=round2(calc(w).profit/Math.max(1,state.settings.partners.length));
-  // still owed = what they put in minus what they have been paid back; half the profit is added on top at payout
-  return{spent,paid,share,left:round2(spent-paid),atPayout:round2(spent-paid+share)};
+  return{spent,paid,share,left:round2(spent+share-paid)};
 }
 const cardLabel=c=>(c.desc||"(no description)")+(c.cert?" | cert "+c.cert:"");
 const whoText=o=>{if(!o||!o.createdBy)return "";let s="Added by "+o.createdBy+" on "+fmtTime(o.createdAt);if(o.updatedAt&&o.updatedAt!==o.createdAt)s+=" | Last edited by "+o.updatedBy+" on "+fmtTime(o.updatedAt);return esc(s)};
@@ -530,8 +554,8 @@ const MONEY_HEAD=["Week","Type","Partner","Amount","Date","Note","Added By","Add
 const moneyRows=(w,label)=>[...w.spend.map(x=>[label,x.kind==="loan"?"Loan":"Spend",x.kind==="loan"?x.partner+" to "+x.to:x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
 function summaryRows(w,label){
   const t=calc(w);
-  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit (unsold slabs at consignor payout)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Paid out","Still owed (spent - paid)","Half of expected profit","Expected at payout"]];
-  state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.paid,c.left,c.share,c.atPayout])});
+  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit (unsold slabs at consignor payout)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Half of profit","Paid out","Still owed"]];
+  state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.share,c.paid,c.left])});
   return rows;
 }
 const fileTag=()=>todayISO();
@@ -704,12 +728,14 @@ function cardRowHTML(c,edit,view){
   else if(c.sold){right=money(+c.soldPrice||0);sub2=(+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null)?round2(+c.soldPrice/+c.mv*100)+"% of market":"sale price"}
   else if(c.repack==="accepted"){right=money(payoutOf(c));sub2=(c.repacker||"Repacker")+" pays"}
   else{right=money(+c.mv||0);sub2=(+c.pct||0)+"% = "+money(payoutOf(c))}
+  const lc=state.hasCost?lotCostsOf(view&&ui.hist?(state.history.find(h=>h.id===ui.hist)||state.week):state.week).get(c.id):undefined;
+  const costPill=lc==null?"":(c.sold?'<span class="badge '+(cashIn(c)-lc<0?"rp-rejected":"sold")+'">Profit '+money(round2(cashIn(c)-lc))+"</span>":'<span class="badge ok">Cost '+money(lc)+"</span>");
   const act=edit==="sel"?"toggle-sel":edit?"edit-card":view?"view-card":"";
   const picked=edit==="sel"&&ui.sel&&ui.sel.has(c.id);
   const pre=edit==="sel"?'<span class="selc'+(picked?" on":"")+'">'+(picked?ic("check",15):"")+"</span>":"";
   const first=n?attachList(c.id)[0]:null;
   const th='<div class="thumbsm '+(first?"":oc)+'">'+(first?'<img data-path="'+esc(first.path)+'" alt="">':ic("cards",20))+"</div>";
-  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Carried to next week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"");
+  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Carried to next week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+costPill;
   return '<div class="row'+(act?"":" static")+(picked?" picked":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
 function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
@@ -730,11 +756,20 @@ function cardListHTML(){
   return state.week.cards.length?emptyBox("search","No cards match. Try another filter."):emptyBox("cards","No cards yet. Tap Scan certs or Add card.");
 }
 function paintList(){const el=$("#cardlist");if(el){el.innerHTML=cardListHTML();hydrateThumbs(el)}}
+// header when the Sold filter is on: sales, cost and profit for the sold slabs
+function soldHero(cs){
+  const sold=cs.filter(c=>c.sold),lc=lotCostsOf(state.week),val=c=>+c.soldPrice||0;
+  const withCost=sold.filter(c=>lc.has(c.id)),sales=round2(sum(sold,val)),cash=round2(sum(sold,cashIn));
+  const cost=round2(sum(withCost,c=>lc.get(c.id))),profit=round2(sum(withCost,val)-cost);
+  const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),avg=smv>0?sum(so,val)/smv*100:null;
+  const top=withCost.length?'<span>Profit on sold slabs</span><b class="big'+(profit<0?" neg":"")+'">'+money(profit)+'</b><small>Sales '+money(round2(sum(withCost,val)))+" - cost "+money(cost)+(withCost.length<sold.length?" | "+(sold.length-withCost.length)+" sold "+(sold.length-withCost.length===1?"slab has":"slabs have")+" no cost yet":"")+"</small>":'<span>Sales</span><b class="big">'+money(sales)+"</b><small>"+(state.hasCost&&sold.length?"Link sold slabs to their buy to see profit":"Profit this week "+money(calc(state.week).profit)+" (all slabs, unsold at payout)")+"</small>";
+  return '<div class="hero">'+top+'<div class="hstats h4"><div><span>Sold</span><b>'+sold.length+'</b></div><div><span>Sales</span><b>'+money(sales)+'</b></div><div><span>Cash in</span><b>'+money(cash)+'</b></div><div><span>Avg % mkt</span><b>'+(avg==null?"n/a":avg.toFixed(1)+"%")+"</b></div></div></div>";
+}
 function cardsView(){
   const t=calc(state.week),P=state.settings.partners,cs=state.week.cards.filter(c=>!ui.owner||c.owner===ui.owner);
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
-  return '<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>"+
+  return (ui.filter==="sold"?soldHero(cs):'<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
   '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
@@ -774,7 +809,7 @@ function activityView(){
   (list.length?out+(list.length>=200?'<p class="hint">Showing the latest 200. Export CSV for everything.</p>':""):emptyBox("activity",scope==="week"?"Nothing yet this week. Tap All time to see earlier weeks.":"No activity yet."));
 }
 function partnerTiles(w){
-  return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),pct=c.spent>0?Math.min(100,Math.max(0,c.paid/c.spent*100)):0;return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Still owed</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk"><span>Spent</span><span>'+money(c.spent)+'</span><span>- Paid</span><span>'+money(c.paid)+'</span><span>+ Half profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span><b>At payout</b></span><span><b>'+money(c.atPayout)+"</b></span></div></div>"}).join("")+"</div>";
+  return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),due=c.spent+Math.max(0,c.share),pct=due>0?Math.min(100,Math.max(0,c.paid/due*100)):0;return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Still owed</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk"><span>Spent</span><span>'+money(c.spent)+'</span><span>+ Half of profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span>- Paid</span><span>'+money(c.paid)+"</span></div></div>"}).join("")+"</div>";
 }
 // filter chips for the Money lists: by partner, plus loans for spend
 function moneyFilter(kind,list){
@@ -785,16 +820,20 @@ function moneyFilter(kind,list){
   const chips=list.length?'<div class="chips mf">'+opts.map(o=>'<button class="chip '+(cur===o[0]?"on":"")+'" data-act="money-f" data-kind="'+kind+'" data-id="'+esc(o[0])+'">'+esc(o[1])+"</button>").join("")+'</div><div class="mftot">'+pick.length+(pick.length===1?" entry":" entries")+(cur==="__loan"?"":" | "+money(tot))+"</div>":"";
   return chips+(list.length&&!pick.length?emptyBox(kind==="spend"?"cart":"send","Nothing for this filter."):ledgerList(pick,kind));
 }
+function profitBox(w){
+  const t=calc(w);
+  return '<div class="cardbox profitbox"><div class="pbtop"><span class="lbl">Profit this week</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b></div><div class="pbrk"><span>Sales so far</span><span>'+money(t.proceeds)+'</span><span>+ Unsold slabs at payout</span><span>'+money(t.due)+'</span><span>- Total spent</span><span>'+money(t.spent)+'</span></div><p class="hint" style="margin:8px 0 0">Exact once everything is sold. Until then, slabs not sold yet count at their consignor payout.</p></div>';
+}
 function moneyView(){
   const w=state.week;
-  return partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
+  return profitBox(w)+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
   '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+moneyFilter("payouts",w.payouts);
 }
 function tilesFor(t){
   return '<div class="hero"><span>Expected profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Unsold at payout '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="hsub">If every slab still in stock sells at its consignor payout</div>'+(t.spent>0&&t.spent>t.due+t.proceeds&&t.stockN+t.soldN>0?'<div class="hwarn">Spent is more than everything in the app is worth. If some slabs are not entered yet, add them and this will balance out.</div>':"")+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
-  return partnerTiles(w)+'<p class="hint">Still owed is what each partner spent minus what they have been paid so far. At payout each also gets half the profit.</p>';
+  return partnerTiles(w)+'<p class="hint">Still owed = what each partner spent + half the profit for the week - what they have already been paid.</p>';
 }
 function exportButtons(id){
   const b=(k,l)=>'<button class="qbtn" data-act="exp" data-kind="'+k+'" data-id="'+id+'">'+ic("download")+l+"</button>";
@@ -1351,7 +1390,7 @@ function cardModal(id,carry){
     field("PSA cert #",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" placeholder="Type, scan, or tap Scan" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button><button type="button" class="btn sec" id="psab">PSA</button></div>'+camHTML("cv")+'<div id="camopts" class="hint" hidden><button class="linkbtn" id="certphb" type="button">Use the phone camera instead</button></div><input type="file" id="certph" accept="image/*" capture="environment" hidden><div class="psast" id="psast"></div>')+
     field("Description",'<input name="desc" placeholder="2023 Charizard ex PSA 10" value="'+esc(d.desc)+'">')+
     '<div class="two"><div>'+field("Date purchased",'<input type="date" name="date" value="'+esc(d.date)+'">')+"</div><div>"+field("Owner",'<select name="owner">'+owners.map(o=>"<option"+(o===d.owner?" selected":"")+">"+esc(o)+"</option>").join("")+"</select>")+"</div></div></div>"+
-    '<div class="sech"><h3>Value</h3></div><div class="formbox"><div class="two"><div>'+field("Market value ($)",'<input name="mv" type="number" step="0.01" inputmode="decimal" value="'+esc(d.mv)+'">')+"</div><div>"+field("Consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+esc(d.pct)+'">')+'</div></div><div class="preview" id="pv"></div></div>'+
+    '<div class="sech"><h3>Value</h3></div><div class="formbox"><div class="two"><div>'+field("Market value ($)",'<input name="mv" type="number" step="0.01" inputmode="decimal" value="'+esc(d.mv)+'">')+"</div><div>"+field("Consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+esc(d.pct)+'">')+'</div></div><div class="preview" id="pv"></div>'+(state.hasCost?'<div class="two"><div>'+field("Bought in",'<select name="spendId"><option value="">Not linked</option>'+w.spend.filter(x=>x.kind!=="loan").slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>'<option value="'+x.id+'"'+(x.id===d.spendId?" selected":"")+">"+esc(fmtDate(x.date)+" | "+x.partner+" | "+money(x.amount)+(x.note?" | "+x.note:""))+"</option>").join("")+"</select>")+"</div><div>"+field("Cost ($)",'<input name="cost" type="number" step="0.01" inputmode="decimal" value="'+esc(d.cost==null?"":d.cost)+'" placeholder="From the buy">')+'</div></div><p class="hint" id="costhint" style="margin:-4px 0 0"></p>':"")+'</div>'+
     '<div class="sech"><h3>Status</h3></div><div class="formbox">'+(state.hasRepack?field("Repacker status",'<div class="seg" data-for="repack">'+[["","Not sent","Not sent to a repacker yet."],["pending","Pending","Sent, waiting for approval."],["accepted","Accepted","Technically sold. The repacker owes the payout."],["rejected","Rejected","The repacker did not take it."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="repack" class="hidesel"><option value="">Not sent</option>'+["pending","accepted","rejected"].map(k=>'<option value="'+k+'"'+(d.repack===k?" selected":"")+">"+k+"</option>").join("")+"</select>")+
     (state.hasRepacker?(()=>{const reps=[...state.settings.repackers];if(d.repacker&&!reps.includes(d.repacker))reps.push(d.repacker);const cur=d.repacker||reps[0];return '<div id="rpwho"'+(d.repack?"":' style="display:none"')+">"+field("Which repacker",'<div class="seg" data-for="repacker">'+reps.map(n=>'<button type="button" data-v="'+esc(n)+'" data-h="">'+esc(n)+"</button>").join("")+'</div><select name="repacker" class="hidesel">'+reps.map(n=>"<option"+(n===cur?" selected":"")+">"+esc(n)+"</option>").join("")+"</select>")+"</div>"})():""):"")+
     field("Customer sale",'<div class="seg" data-for="disp">'+[["stock","Not sold","Still ours (or with a repacker)."],["sold","Sold","Sold to a customer for cash."],["traded","Traded","Traded to a customer."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="disp" class="hidesel"><option value="stock"'+sel("stock")+'>Not sold to a customer</option><option value="sold"'+sel("sold")+'>Sold to a customer for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
@@ -1405,7 +1444,14 @@ function cardModal(id,carry){
   $("#certphb",el).addEventListener("click",()=>{camOff();certph.value="";certph.click()});
   certph.addEventListener("change",async()=>{const file=certph.files[0];if(!file)return;const st=$("#psast",el);st.className="psast";st.textContent="Reading label...";let c=await readBarcodeFromImage(file),o=null;if(ocrOn()){try{o=await ocrCanvas(await imageCanvas(file,2200))}catch(e){}}if(!c&&o&&o.cert)c=o.cert;const named=fillName(o);if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c+(named?" and the card name":"")}else if(named){st.className="psast ok";st.textContent="Read the card name. Type or scan the cert."}else{beep(false);st.className="psast err";st.textContent="Nothing read in that photo. Get closer to the label, or type the number."}});
   const cashNow=()=>f.disp.value==="sold"?(+f.soldPrice.value||0):f.disp.value==="traded"?(+f.tradeCash.value||0):0;
-  const pv=()=>{$("#pv",el).textContent="Payout: "+money(payoutOf({mv:f.mv.value,pct:f.pct.value}))};
+  const pv=()=>{$("#pv",el).textContent="Payout: "+money(payoutOf({mv:f.mv.value,pct:f.pct.value}));costHint()};
+  const costHint=()=>{
+    const h=$("#costhint",el);if(!h||!f.spendId)return;const sid=f.spendId.value;
+    if(!sid||f.cost.value!==""){h.textContent=f.cost.value!==""?"":"Link the buy this slab came from, or type what it cost.";return}
+    const me0={id:id||"__new",mv:f.mv.value,cost:"",spendId:sid},cards=w.cards.filter(c=>c.id!==id).concat([me0]);
+    const v=lotCosts({spend:w.spend,cards}).get(me0.id),n=cards.filter(c=>c.spendId===sid).length;
+    h.textContent="Share of this buy: "+money(v||0)+" ("+plural(n,"slab")+" in it, split by market value)";
+  };
   const spv=()=>{
     const e2=$("#spv",el);if(!e2||!f.split)return;
     const cash=cashNow(),p=Math.min(100,Math.max(0,+f.split.value||0)),a=round2(cash*p/100);
@@ -1413,6 +1459,7 @@ function cardModal(id,carry){
   };
   const syncPct=()=>{const m=+f.mv.value||0;f.soldPctMk.value=(m>0&&f.soldPrice.value!=="")?round2(+f.soldPrice.value/m*100):""};
   pv();
+  if(f.spendId){f.spendId.addEventListener("change",costHint);f.cost.addEventListener("input",costHint)}
   f.mv.addEventListener("input",()=>{pv();syncPct()});f.pct.addEventListener("input",pv);
   f.soldPrice.addEventListener("input",()=>{syncPct();spv()});
   f.soldPctMk.addEventListener("input",()=>{const m=+f.mv.value||0;if(m>0&&f.soldPctMk.value!==""){f.soldPrice.value=round2(m*+f.soldPctMk.value/100);spv()}});
@@ -1434,7 +1481,7 @@ function cardModal(id,carry){
   const commit=async()=>{
     const v=f.disp.value,isOut=v!=="stock";
     const price=v==="sold"?f.soldPrice.value:v==="traded"?f.tradeValue.value:"";
-    const rec={date:f.date.value||todayISO(),cert:f.cert.value.trim(),desc:f.desc.value.trim(),owner:f.owner.value,mv:f.mv.value===""?"":+f.mv.value,pct:f.pct.value===""?state.settings.defaultPct:+f.pct.value,sold:isOut,saleType:isOut?v:"",soldPrice:price===""?"":+price,soldDate:isOut?f.soldDate.value:"",tradeCash:v==="traded"&&f.tradeCash.value!==""?+f.tradeCash.value:"",notes:f.notes.value.trim(),repack:f.repack?f.repack.value:(d.repack||""),repacker:f.repacker?f.repacker.value:(d.repacker||""),repackDate:f.repack&&f.repack.value&&f.repack.value===d.repack?d.repackDate:""};
+    const rec={date:f.date.value||todayISO(),cert:f.cert.value.trim(),desc:f.desc.value.trim(),owner:f.owner.value,mv:f.mv.value===""?"":+f.mv.value,pct:f.pct.value===""?state.settings.defaultPct:+f.pct.value,sold:isOut,saleType:isOut?v:"",soldPrice:price===""?"":+price,soldDate:isOut?f.soldDate.value:"",tradeCash:v==="traded"&&f.tradeCash.value!==""?+f.tradeCash.value:"",notes:f.notes.value.trim(),cost:f.cost?f.cost.value:(d.cost==null?"":d.cost),spendId:f.spendId?f.spendId.value:(d.spendId||null),repack:f.repack?f.repack.value:(d.repack||""),repacker:f.repacker?f.repacker.value:(d.repacker||""),repackDate:f.repack&&f.repack.value&&f.repack.value===d.repack?d.repackDate:""};
     let cardId=id;
     if(id){if(!await api(sb.from("cards").update(cardRow(rec)).eq("id",id)))return null}
     else{const r=await api(sb.from("cards").insert(Object.assign({week_id:w.id},cardRow(rec),d.fromCardId?{from_card_id:d.fromCardId}:{})).select("id").single());if(!r)return null;cardId=r.data.id}
@@ -1495,6 +1542,7 @@ function entryModal(kind,id){
     '<div class="two"><div>'+field("Amount ($)",'<input name="amount" type="number" step="0.01" inputmode="decimal" required value="'+esc(d.amount)+'">')+"</div><div>"+field("Date",'<input type="date" name="date" value="'+esc(d.date)+'">')+"</div></div>"+
     field("Note",'<input name="note" placeholder="Zelle, cash, lot name" value="'+esc(d.note||"")+'">')+
     photoHTML(kind==="spend"?"Photos of the buy (receipt, screenshots, the slabs)":"Photos (Zelle screenshot, receipt)")+
+    (x&&kind==="spend"&&state.hasCost?(()=>{const inLot=w.cards.filter(c=>c.spendId===x.id),lc=lotCostsOf(w);return '<div class="sech"><h3>Slabs in this buy ('+inLot.length+')</h3></div>'+(inLot.length?'<div class="lotlist">'+inLot.map(c=>'<div class="lotrow"><span>'+esc(c.desc||"Cert "+(c.cert||"n/a"))+'</span><b>'+money(lc.get(c.id)||0)+"</b></div>").join("")+"</div>":"")+'<p class="hint">'+(inLot.length?"The buy amount is split across these slabs by market value.":"No slabs linked yet.")+" To link slabs, go to Cards, tap Edit many, select them, then pick this buy under Bought in.</p>"})():"")+
     '<p class="hint">'+whoText(x)+"</p>"+
     '<div class="actions"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button>'+(x?'<button class="btn danger" type="button" id="dele">Delete</button>':"")+"</div></form>");
   const ph=photoWidget(el,kind,id);
@@ -1536,7 +1584,8 @@ function bulkEditModal(){
     '<div class="sech"><h3>Sold</h3></div><div class="formbox">'+seg("sold",[["","No change","Leave sold and unsold as they are."],["no","Not sold","Marks them back in stock and clears the sale."],["yes","Sold","Sold to a customer at a % of market."]])+
     '<div id="besale" hidden><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-bp="'+q+'">'+q+"%</button>").join("")+'</div><div class="two"><div>'+field("Sold at % of market",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="90">')+"</div><div>"+field("Or total for the lot ($)",'<input name="total" type="number" step="0.01" inputmode="decimal">')+'</div></div><div class="preview" id="besum"></div>'+field("Sold date",'<input type="date" name="date" value="'+todayISO()+'">')+"</div></div>"+
     (state.hasRepack?'<div class="sech"><h3>Repacker status</h3></div><div class="formbox">'+seg("repack",[["*","No change","Leave as is."],["","Not sent","Clear the status."],["pending","Pending","Sent, waiting for approval."],["accepted","Accepted","Technically sold. The repacker owes the payout."],["rejected","Rejected","The repacker did not take it."]])+(state.hasRepacker?'<div id="bewho" hidden>'+field("Which repacker",seg("repacker",reps.map(n=>[n,n,""])))+"</div>":"")+"</div>":"")+
-    '<div class="sech"><h3>Value</h3></div><div class="formbox"><div class="two"><div>'+field("Consignor %",'<input name="cpct" type="number" step="0.1" inputmode="decimal" placeholder="No change">')+"</div><div>"+field("Owner",'<select name="owner"><option value="">No change</option>'+["Shared",...P].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div></div></div>"+
+    '<div class="sech"><h3>Value</h3></div><div class="formbox"><div class="two"><div>'+field("Consignor %",'<input name="cpct" type="number" step="0.1" inputmode="decimal" placeholder="No change">')+"</div><div>"+field("Owner",'<select name="owner"><option value="">No change</option>'+["Shared",...P].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div></div>"+
+    (state.hasCost?field("Bought in (the lot these came from)",'<select name="lot"><option value="*">No change</option><option value="">Not linked</option>'+state.week.spend.filter(x=>x.kind!=="loan").slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>'<option value="'+x.id+'">'+esc(fmtDate(x.date)+" | "+x.partner+" | "+money(x.amount)+(x.note?" | "+x.note:""))+"</option>").join("")+"</select>")+'<p class="hint" id="lothint" style="margin:-4px 0 0">The buy amount is split across its slabs by market value. A cost typed on a slab is kept.</p>':"")+"</div>"+
     '<div class="actions stick"><button class="btn" type="submit">Apply to '+plural(cards.length,"card")+'</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
   const f=$("#bef",el);f.repack&&(f.repack.value="*");wireSeg(el);
   const plan=()=>{
@@ -1553,15 +1602,15 @@ function bulkEditModal(){
   paint();
   f.addEventListener("submit",async e=>{
     e.preventDefault();
-    const soldV=f.sold.value,rp=f.repack?f.repack.value:"*",cp=f.cpct.value,ow=f.owner.value,r=plan(),date=f.date.value||todayISO();
-    if(!soldV&&rp==="*"&&cp===""&&!ow){toast("Nothing to change");return}
+    const soldV=f.sold.value,rp=f.repack?f.repack.value:"*",cp=f.cpct.value,ow=f.owner.value,lot=f.lot?f.lot.value:"*",r=plan(),date=f.date.value||todayISO();
+    if(!soldV&&rp==="*"&&cp===""&&!ow&&lot==="*"){toast("Nothing to change");return}
     if(soldV==="yes"&&!(r.total>0)&&!confirm("The total is $0. Mark these cards sold anyway?"))return;
     busy(f,true);let ok=true;
     const patchFor=(c,i)=>{const pt={};
       if(soldV==="yes"){pt.sold=true;pt.sale_type="sold";pt.sold_price=r.prices[i];pt.sold_date=date;pt.trade_cash=null}
       if(soldV==="no"){pt.sold=false;pt.sale_type=null;pt.sold_price=null;pt.sold_date=null;pt.trade_cash=null}
       if(rp!=="*"&&state.hasRepack){pt.repack_status=rp||null;pt.repack_date=rp?todayISO():null;if(state.hasRepacker)pt.repacker=rp?(f.repacker.value||reps[0]):null}
-      if(cp!=="")pt.consignor_pct=+cp;if(ow)pt.owner=ow;return pt};
+      if(cp!=="")pt.consignor_pct=+cp;if(ow)pt.owner=ow;if(lot!=="*")pt.spend_id=lot||null;return pt};
     for(let i=0;i<cards.length&&ok;i+=8){
       const rs=await Promise.all(cards.slice(i,i+8).map((c,j)=>api(sb.from("cards").update(patchFor(c,i+j)).eq("id",c.id))));
       if(rs.some(x=>!x))ok=false;
@@ -1820,8 +1869,8 @@ function doExportAll(kind){
   else if(kind==="money")exportFile("repack-all-money-"+fileTag()+".csv",toCSV([MONEY_HEAD,...weeks.flatMap(x=>moneyRows(x.w,x.label))]));
   else{
     const P=state.settings.partners;
-    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Expected profit","Rate %",...P.flatMap(p=>[p+" spent",p+" paid",p+" still owed",p+" half profit",p+" at payout"])];
-    const rows=weeks.map(x=>{const t=calc(x.w);return [x.label,fmtDate(x.w.start),x.w.end?fmtDate(x.w.end):"",t.stockN,t.soldN,t.mv,t.due,t.proceeds,t.spent,t.paid,t.profit,t.rate==null?"":round2(t.rate),...P.flatMap(p=>{const c=pcalc(x.w,p);return [c.spent,c.paid,c.left,c.share,c.atPayout]})]});
+    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Expected profit","Rate %",...P.flatMap(p=>[p+" spent",p+" half of profit",p+" paid",p+" still owed"])];
+    const rows=weeks.map(x=>{const t=calc(x.w);return [x.label,fmtDate(x.w.start),x.w.end?fmtDate(x.w.end):"",t.stockN,t.soldN,t.mv,t.due,t.proceeds,t.spent,t.paid,t.profit,t.rate==null?"":round2(t.rate),...P.flatMap(p=>{const c=pcalc(x.w,p);return [c.spent,c.share,c.paid,c.left]})]});
     exportFile("repack-weekly-totals-"+fileTag()+".csv",toCSV([head,...rows]));
   }
 }
