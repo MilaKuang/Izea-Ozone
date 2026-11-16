@@ -128,8 +128,9 @@ let ui={sel:null,tab:"cards",q:"",filter:"all",hist:null,actUser:"",offline:fals
 // ---------- config ----------
 function cfg(){
   const c=window.REPACK_CONFIG||{};
-  if(c.supabaseUrl&&c.supabaseAnonKey)return{url:c.supabaseUrl,key:c.supabaseAnonKey};
-  try{const l=JSON.parse(localStorage.getItem(CFG_KEY));if(l&&l.url&&l.key)return l}catch(e){}
+  const okUrl=u=>/^https?:\/\/[^\s]+\.[^\s]+/i.test(String(u||"").trim());
+  if(okUrl(c.supabaseUrl)&&c.supabaseAnonKey)return{url:String(c.supabaseUrl).trim(),key:String(c.supabaseAnonKey).trim()};
+  try{const l=JSON.parse(localStorage.getItem(CFG_KEY));if(l&&okUrl(l.url)&&l.key)return{url:l.url.trim(),key:String(l.key).trim()};if(l)localStorage.removeItem(CFG_KEY)}catch(e){}
   return null;
 }
 
