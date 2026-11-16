@@ -325,6 +325,7 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .ppbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:2px}
 .ppbox b{font-size:21px;font-variant-numeric:tabular-nums}
 .ppbox small{font-size:11.5px;color:var(--mute)}
+.hstats.c4{grid-template-columns:repeat(4,1fr)}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -454,7 +455,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=28;
+const APP_VERSION=29;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -516,7 +517,7 @@ function calc(w){
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),ssp=sum(so,c=>c.soldPrice);
   const acc=stock.filter(c=>c.repack==="accepted"),pend=stock.filter(c=>c.repack==="pending"),accBy={};
   acc.forEach(c=>{const n=c.repacker||"Repacker";accBy[n]=round2((accBy[n]||0)+payoutOf(c))});
-  return{soldProfit:round2(proceeds+sum(acc,payoutOf)-spent),unsoldProfit:round2(due-spent),carriedN,accBy,accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
+  return{soldProfit:round2(proceeds+sum(acc,payoutOf)-spent),unsoldProfit:round2(due-spent),carriedN,accBy,accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length-pend.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
 }
 // each partner gets back what they spent plus an equal share of the profit; payouts already made come off that
 function pcalc(w,p){
@@ -750,7 +751,7 @@ function cardRowHTML(c,edit,view){
   const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Carried to next week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+costPill;
   return '<div class="row'+(act?"":" static")+(picked?" picked":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
-function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
+function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"&&c.repack!=="pending"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
 function filteredCards(){
   const q=ui.q.trim().toLowerCase();
   const l=state.week.cards.filter(c=>statusOk(c,ui.filter)&&(!ui.owner||c.owner===ui.owner)&&(!q||(c.desc+" "+(c.cert||"")+" "+c.owner+" "+(c.notes||"")).toLowerCase().includes(q))).slice();
@@ -781,7 +782,7 @@ function cardsView(){
   const t=calc(state.week),P=state.settings.partners,cs=state.week.cards.filter(c=>!ui.owner||c.owner===ui.owner);
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
-  return (ui.filter==="sold"?soldHero(cs):'<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
+  return (ui.filter==="sold"?soldHero(cs):'<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
   '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
@@ -850,7 +851,7 @@ function moneyView(){
 }
 function tilesFor(t){
   const line=(lbl,v,how)=>'<div class="xrow"><div><b>'+lbl+'</b><small>'+how+'</small></div><b>'+money(v)+"</b></div>";
-  return '<div class="hero"><span>Sold profit</span><b class="big'+(t.soldProfit<0?" neg":"")+'">'+money(t.soldProfit)+'</b><div class="brk"><span>Sales '+money(t.proceeds)+'</span><span>+ Accepted by repackers '+money(t.accDue)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="xlist">'+line("Expected profit, all slabs",t.profit,"Sales + unsold at payout "+money(t.due)+" - spent")+line("Expected profit, unsold slabs only",t.unsoldProfit,"Unsold at payout "+money(t.due)+" - spent")+"</div>"+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
+  return '<div class="hero"><span>Sold profit</span><b class="big'+(t.soldProfit<0?" neg":"")+'">'+money(t.soldProfit)+'</b><div class="brk"><span>Sales '+money(t.proceeds)+'</span><span>+ Accepted by repackers '+money(t.accDue)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="xlist">'+line("Expected profit, all slabs",t.profit,"Sales + unsold at payout "+money(t.due)+" - spent")+line("Expected profit, unsold slabs only",t.unsoldProfit,"Unsold at payout "+money(t.due)+" - spent")+"</div>"+'</div><div class="tiles">'+tile("Market value",money(t.mv),(t.stockN+t.pendN+t.accN)+" unsold"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
   return partnerTiles(w)+'<p class="hint">Still owed = what each partner spent + half the profit from what has sold - what they have already been paid.</p>';
