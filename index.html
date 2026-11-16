@@ -313,6 +313,18 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .profitbox{margin-bottom:12px}
 .pbtop{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .profitbox .big{font-size:26px}
+.xlist{margin-top:12px;border-top:1px solid var(--line)}
+.xrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0 0}
+.xrow div>b{font-size:14px;font-weight:600}
+.xrow small{display:block;font-size:11.5px;color:var(--mute);margin-top:2px}
+.xrow>b{font-size:17px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hero .xlist{border-top-color:rgba(255,255,255,.18)}
+.hero .xrow small{color:inherit;opacity:.75}
+.hero .xrow div>b{font-weight:600}
+.grid2.pp{margin-bottom:12px}
+.ppbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:2px}
+.ppbox b{font-size:21px;font-variant-numeric:tabular-nums}
+.ppbox small{font-size:11.5px;color:var(--mute)}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -442,7 +454,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=26;
+const APP_VERSION=28;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -504,15 +516,15 @@ function calc(w){
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),ssp=sum(so,c=>c.soldPrice);
   const acc=stock.filter(c=>c.repack==="accepted"),pend=stock.filter(c=>c.repack==="pending"),accBy={};
   acc.forEach(c=>{const n=c.repacker||"Repacker";accBy[n]=round2((accBy[n]||0)+payoutOf(c))});
-  return{carriedN,accBy,accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
+  return{soldProfit:round2(proceeds+sum(acc,payoutOf)-spent),unsoldProfit:round2(due-spent),carriedN,accBy,accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
 }
 // each partner gets back what they spent plus an equal share of the profit; payouts already made come off that
 function pcalc(w,p){
   // a loan between partners moves money from one to the other without counting as spend
   const spent=round2(sum(w.spend.filter(x=>x.partner===p),x=>x.amount)-sum(w.spend.filter(x=>x.kind==="loan"&&x.to===p),x=>x.amount));
   const paid=sum(w.payouts.filter(x=>x.partner===p),x=>x.amount);
-  // still owed = what they spent + half the week's profit - what they have already been paid
-  const share=round2(calc(w).profit/Math.max(1,state.settings.partners.length));
+  // still owed = what they spent + half the profit from what has sold - what they have already been paid
+  const share=round2(calc(w).soldProfit/Math.max(1,state.settings.partners.length));
   return{spent,paid,share,left:round2(spent+share-paid)};
 }
 const cardLabel=c=>(c.desc||"(no description)")+(c.cert?" | cert "+c.cert:"");
@@ -554,7 +566,7 @@ const MONEY_HEAD=["Week","Type","Partner","Amount","Date","Note","Added By","Add
 const moneyRows=(w,label)=>[...w.spend.map(x=>[label,x.kind==="loan"?"Loan":"Spend",x.kind==="loan"?x.partner+" to "+x.to:x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
 function summaryRows(w,label){
   const t=calc(w);
-  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit (unsold slabs at consignor payout)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Half of profit","Paid out","Still owed"]];
+  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Expected profit, all slabs (sales + unsold at payout - spent)",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],["Sold profit (sales + accepted by repackers - spent)",t.soldProfit],["Expected profit, unsold slabs only (unsold at payout - spent)",t.unsoldProfit],[],["Partner","Spent","Half of sold profit","Paid out","Still owed"]];
   state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.share,c.paid,c.left])});
   return rows;
 }
@@ -809,7 +821,7 @@ function activityView(){
   (list.length?out+(list.length>=200?'<p class="hint">Showing the latest 200. Export CSV for everything.</p>':""):emptyBox("activity",scope==="week"?"Nothing yet this week. Tap All time to see earlier weeks.":"No activity yet."));
 }
 function partnerTiles(w){
-  return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),due=c.spent+Math.max(0,c.share),pct=due>0?Math.min(100,Math.max(0,c.paid/due*100)):0;return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Still owed</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk"><span>Spent</span><span>'+money(c.spent)+'</span><span>+ Half of profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span>- Paid</span><span>'+money(c.paid)+"</span></div></div>"}).join("")+"</div>";
+  return '<div class="grid2">'+state.settings.partners.map((p,i)=>{const c=pcalc(w,p),due=c.spent+Math.max(0,c.share),pct=due>0?Math.min(100,Math.max(0,c.paid/due*100)):0;return '<div class="pcard"><div class="pn"><span class="dot'+(i?" o1":"")+'"></span>'+esc(p)+'</div><span class="lbl">Still owed</span><b class="big'+(c.left<0?" neg":"")+'">'+money(c.left)+'</b><div class="prog"><i style="width:'+pct.toFixed(0)+'%"></i></div><div class="pbrk"><span>Spent</span><span>'+money(c.spent)+'</span><span>+ Half profit</span><span class="'+(c.share<0?"neg":"")+'">'+money(c.share)+'</span><span>- Paid</span><span>'+money(c.paid)+"</span></div></div>"}).join("")+"</div>";
 }
 // filter chips for the Money lists: by partner, plus loans for spend
 function moneyFilter(kind,list){
@@ -821,19 +833,27 @@ function moneyFilter(kind,list){
   return chips+(list.length&&!pick.length?emptyBox(kind==="spend"?"cart":"send","Nothing for this filter."):ledgerList(pick,kind));
 }
 function profitBox(w){
-  const t=calc(w);
-  return '<div class="cardbox profitbox"><div class="pbtop"><span class="lbl">Profit this week</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b></div><div class="pbrk"><span>Sales so far</span><span>'+money(t.proceeds)+'</span><span>+ Unsold slabs at payout</span><span>'+money(t.due)+'</span><span>- Total spent</span><span>'+money(t.spent)+'</span></div><p class="hint" style="margin:8px 0 0">Exact once everything is sold. Until then, slabs not sold yet count at their consignor payout.</p></div>';
+  const t=calc(w),line=(lbl,v,how)=>'<div class="xrow"><div><b>'+lbl+'</b><small>'+how+'</small></div><b class="'+(v<0?"neg":"")+'">'+money(v)+"</b></div>";
+  return '<div class="cardbox profitbox"><div class="pbtop"><span class="lbl">Sold profit</span><b class="big'+(t.soldProfit<0?" neg":"")+'">'+money(t.soldProfit)+'</b></div><div class="pbrk"><span>Sales</span><span>'+money(t.proceeds)+'</span><span>+ Accepted by repackers</span><span>'+money(t.accDue)+'</span><span>- Total spent</span><span>'+money(t.spent)+'</span></div>'+
+    '<div class="xlist">'+line("Expected profit, all slabs",t.profit,"Sales "+money(t.proceeds)+" + unsold at payout "+money(t.due)+" - spent "+money(t.spent))+
+    line("Expected profit, unsold slabs only",t.unsoldProfit,"Unsold at payout "+money(t.due)+" - spent "+money(t.spent))+"</div></div>";
+}
+// sold profit next to what the week would make if every slab sells at its payout
+function profitPair(w){
+  const t=calc(w),box=(lbl,v,sub)=>'<div class="ppbox"><span class="lbl">'+lbl+'</span><b class="'+(v<0?"neg":"")+'">'+money(v)+"</b><small>"+sub+"</small></div>";
+  return '<div class="grid2 pp">'+box("Profit sold so far",t.soldProfit,"Sales + accepted - spent")+box("If everything sells",t.profit,"Sold + unsold at payout - spent")+"</div>";
 }
 function moneyView(){
   const w=state.week;
-  return profitBox(w)+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
+  return profitPair(w)+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
   '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+moneyFilter("payouts",w.payouts);
 }
 function tilesFor(t){
-  return '<div class="hero"><span>Expected profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Unsold at payout '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="hsub">If every slab still in stock sells at its consignor payout</div>'+(t.spent>0&&t.spent>t.due+t.proceeds&&t.stockN+t.soldN>0?'<div class="hwarn">Spent is more than everything in the app is worth. If some slabs are not entered yet, add them and this will balance out.</div>':"")+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
+  const line=(lbl,v,how)=>'<div class="xrow"><div><b>'+lbl+'</b><small>'+how+'</small></div><b>'+money(v)+"</b></div>";
+  return '<div class="hero"><span>Sold profit</span><b class="big'+(t.soldProfit<0?" neg":"")+'">'+money(t.soldProfit)+'</b><div class="brk"><span>Sales '+money(t.proceeds)+'</span><span>+ Accepted by repackers '+money(t.accDue)+'</span><span>- Spent '+money(t.spent)+'</span></div><div class="xlist">'+line("Expected profit, all slabs",t.profit,"Sales + unsold at payout "+money(t.due)+" - spent")+line("Expected profit, unsold slabs only",t.unsoldProfit,"Unsold at payout "+money(t.due)+" - spent")+"</div>"+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock"+(t.carriedN?" | "+t.carriedN+" carried to next week":""))+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
-  return partnerTiles(w)+'<p class="hint">Still owed = what each partner spent + half the profit for the week - what they have already been paid.</p>';
+  return partnerTiles(w)+'<p class="hint">Still owed = what each partner spent + half the profit from what has sold - what they have already been paid.</p>';
 }
 function exportButtons(id){
   const b=(k,l)=>'<button class="qbtn" data-act="exp" data-kind="'+k+'" data-id="'+id+'">'+ic("download")+l+"</button>";
@@ -1869,7 +1889,7 @@ function doExportAll(kind){
   else if(kind==="money")exportFile("repack-all-money-"+fileTag()+".csv",toCSV([MONEY_HEAD,...weeks.flatMap(x=>moneyRows(x.w,x.label))]));
   else{
     const P=state.settings.partners;
-    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Expected profit","Rate %",...P.flatMap(p=>[p+" spent",p+" half of profit",p+" paid",p+" still owed"])];
+    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Expected profit","Rate %",...P.flatMap(p=>[p+" spent",p+" half of sold profit",p+" paid",p+" still owed"])];
     const rows=weeks.map(x=>{const t=calc(x.w);return [x.label,fmtDate(x.w.start),x.w.end?fmtDate(x.w.end):"",t.stockN,t.soldN,t.mv,t.due,t.proceeds,t.spent,t.paid,t.profit,t.rate==null?"":round2(t.rate),...P.flatMap(p=>{const c=pcalc(x.w,p);return [c.spent,c.share,c.paid,c.left]})]});
     exportFile("repack-weekly-totals-"+fileTag()+".csv",toCSV([head,...rows]));
   }
