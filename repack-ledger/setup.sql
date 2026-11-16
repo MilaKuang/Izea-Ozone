@@ -10,9 +10,9 @@ create table public.members (
 );
 
 insert into public.members (email, name) values
-  ('izea@example.com', 'Izea'),
-  ('mila@example.com', 'Mila'),
-  ('alex@example.com', 'Alex');
+  ('Izeaspeer3023@gmail.com', 'Izea'),
+  ('mikickng@gmail.com', 'Mila'),
+  ('alexgmiller00@gmail.com', 'Alex');
 
 create function public.is_member() returns boolean
 language sql stable security definer set search_path = public as $$
