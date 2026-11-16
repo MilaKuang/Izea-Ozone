@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Repack">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Repack Ledger</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#0f172a;--mute:#64748b;--line:#e2e8f0;--acc:#0d9488;--acc-ink:#fff;--neg:#dc2626;--pos:#059669;--chip:#e2e8f0;--warn:#fef3c7;--warn-ink:#92400e}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1220;--card:#131c2e;--ink:#e5e7eb;--mute:#94a3b8;--line:#243049;--acc:#14b8a6;--acc-ink:#04201d;--neg:#f87171;--pos:#34d399;--chip:#1e293b;--warn:#422006;--warn-ink:#fde68a}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body.noscroll{overflow:hidden}
+#app{max-width:720px;margin:0 auto;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:calc(12px + env(safe-area-inset-top)) 16px 10px;position:sticky;top:0;background:var(--bg);z-index:5}
+header .hl{display:flex;align-items:center;gap:8px;min-width:0}
+header h1{font-size:20px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header p{margin:0;color:var(--mute);font-size:13px}
+main{padding:0 16px}
+button{font:inherit;color:inherit}
+.btn{background:var(--acc);color:var(--acc-ink);border:0;border-radius:10px;padding:10px 14px;font-weight:600;min-height:44px;cursor:pointer}
+.btn.sec{background:var(--chip);color:var(--ink)}
+.btn.danger{background:transparent;color:var(--neg);border:1px solid var(--neg)}
+.btn.sm{padding:6px 12px;min-height:36px;font-size:14px}
+.btn.block{width:100%}
+.icon{background:var(--chip);border:0;border-radius:10px;min-height:40px;padding:0 12px;cursor:pointer}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:6px 0 12px}
+.tiles.t3{grid-template-columns:repeat(3,1fr)}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:6px 0 12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;min-width:0}
+.tile span{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.03em}
+.tile b{font-size:20px;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
+.t3 .tile b{font-size:16px}
+.tile small{color:var(--mute);font-size:12px;margin-top:2px}
+.neg{color:var(--neg)}.pos{color:var(--pos)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px}
+.toolbar .btn{flex:1 1 auto}
+.search{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:16px}
+.chips{display:flex;gap:6px;margin:8px 0;overflow-x:auto}
+.chip{background:var(--chip);border:0;border-radius:99px;padding:6px 12px;font-size:14px;white-space:nowrap;cursor:pointer}
+.chip.on{background:var(--acc);color:var(--acc-ink)}
+.row{display:flex;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.row.static{cursor:default}
+.row .main{min-width:0;flex:1}
+.row .desc{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sub{color:var(--mute);font-size:13px}
+.row .amt{text-align:right;white-space:nowrap}
+.badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;background:var(--warn);color:var(--warn-ink);margin-left:4px;font-weight:600}
+.badge.ok{background:var(--chip);color:var(--ink)}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px}
+.sec h3{margin:0;font-size:16px}
+.empty{color:var(--mute);text-align:center;padding:20px 8px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--mute);text-transform:uppercase}
+tr:last-child td{border-bottom:0}
+.banner{margin:0 16px 10px;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.banner span{font-size:14px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav button{flex:1;background:none;border:0;padding:14px 4px;font-size:14px;color:var(--mute);cursor:pointer;font-weight:600}
+nav button.on{color:var(--acc)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.sheet h2{margin:0 0 10px;font-size:18px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
+.chk{display:flex;align-items:center;color:var(--ink);font-size:16px;margin:12px 0 4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.actions .btn{flex:1 1 auto}
+.preview{margin-top:8px;font-weight:600}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom));background:#0f172a;color:#fff;padding:10px 16px;border-radius:99px;z-index:30;font-size:14px;max-width:90%;text-align:center}
+.hint{color:var(--mute);font-size:13px;margin:6px 0}
+.video{width:100%;max-height:38vh;object-fit:cover;border-radius:12px;background:#000;margin:8px 0}
+.certrow{display:flex;gap:8px}.certrow input{flex:1}.certrow .btn{flex:0 0 auto}
+.scanin{font-size:20px;padding:14px}
+.welcome{padding:calc(40px + env(safe-area-inset-top)) 20px 20px;text-align:center}
+.welcome h1{margin:0 0 6px}
+.welcome .btn{margin-top:12px}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.thumb{position:relative;width:76px;height:76px;border:1px solid var(--line);border-radius:10px;overflow:hidden;padding:0;background:var(--chip);cursor:pointer}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.65);color:#fff;border-radius:99px;width:20px;height:20px;line-height:20px;text-align:center;font-size:12px}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
+.lightbox img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:8px}
+.lightbox .bar{display:flex;gap:10px;margin-top:12px}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
+.kv span:first-child{color:var(--mute)}
+.selbar{position:fixed;left:0;right:0;bottom:calc(50px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto;background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;z-index:7}
+.selbar .sub{font-size:12px;color:var(--mute)}
+.selbtns{display:flex;gap:6px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<input type="file" id="csvin" accept=".csv,text/csv,text/plain" hidden>
+<script src="config.js"></script>
+<script src="supabase.js"></script>
+<script>
+"use strict";
+const DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const CFG_KEY="repack-cfg",CACHE_KEY="repack-cache-v1";
+
+const $=(s,e=document)=>e.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const round2=n=>Math.round((n+Number.EPSILON)*100)/100;
+const money=n=>{n=round2(n||0);return (n<0?"-":"")+"$"+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})};
+const pad=n=>String(n).padStart(2,"0");
+const isoOf=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const todayISO=()=>isoOf(new Date());
+const parseISO=s=>{const [y,m,d]=String(s).split("-").map(Number);return new Date(y,(m||1)-1,d||1)};
+const fmtDate=iso=>{if(!iso)return "";const [y,m,d]=String(iso).slice(0,10).split("-");return +m+"/"+ +d+"/"+y};
+const fmtTime=iso=>{if(!iso)return "";const d=new Date(iso);return fmtDate(isoOf(d))+" "+d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})};
+const sum=(a,f)=>round2(a.reduce((t,x)=>t+(+f(x)||0),0));
+
+let sb=null,state=null,me=null,rt=null,rtT=null;
+let ui={sel:null,tab:"cards",q:"",filter:"all",hist:null,actUser:"",offline:false,dirty:false,recovery:false,denied:""};
+
+// ---------- config ----------
+function cfg(){
+  const c=window.REPACK_CONFIG||{};
+  if(c.supabaseUrl&&c.supabaseAnonKey)return{url:c.supabaseUrl,key:c.supabaseAnonKey};
+  try{const l=JSON.parse(localStorage.getItem(CFG_KEY));if(l&&l.url&&l.key)return l}catch(e){}
+  return null;
+}
+
+// ---------- row mapping ----------
+const num=v=>v==null?"":+v;
+const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
+const mapEntry=r=>({id:r.id,partner:r.partner,amount:+r.amount,date:r.entry_date||"",note:r.note||"",cardId:r.card_id,createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
+const cardRow=r=>({date_purchased:r.date||null,cert:r.cert||null,description:r.desc||"",owner:r.owner,market_value:r.mv===""?null:+r.mv,consignor_pct:+r.pct,sold:!!r.sold,sale_type:r.sold?(r.saleType||"sold"):null,sold_price:(r.soldPrice===""||r.soldPrice==null)?null:+r.soldPrice,sold_date:r.soldDate||null,trade_cash:(r.sold&&r.saleType==="traded"&&r.tradeCash!==""&&r.tradeCash!=null)?+r.tradeCash:null,notes:r.notes||""});
+
+async function fetchAll(table,order){
+  let out=[],from=0;
+  for(;;){
+    const {data,error}=await sb.from(table).select("*").order(order||"seq",{ascending:true}).range(from,from+999);
+    if(error)throw error;
+    out=out.concat(data);
+    if(data.length<1000)break;
+    from+=1000;
+  }
+  return out;
+}
+async function loadAll(){
+  const [st,wk,cd,sp,po,at,au]=await Promise.all([
+    sb.from("settings").select("*").eq("id",1).single(),
+    sb.from("weeks").select("*").order("start_date",{ascending:true}),
+    fetchAll("cards"),fetchAll("spend"),fetchAll("payouts"),fetchAll("attachments","created_at"),
+    sb.from("audit").select("*").order("id",{ascending:false}).limit(300)
+  ]);
+  for(const r of [st,wk,au])if(r.error)throw r.error;
+  const by=(rows,map)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.week_id))m.set(r.week_id,[]);m.get(r.week_id).push(map(r))});return m};
+  const cm=by(cd,mapCard),sm=by(sp,mapEntry),pm=by(po,mapEntry);
+  const mk=w=>({id:w.id,label:w.label,start:w.start_date,end:w.end_date,cards:cm.get(w.id)||[],spend:sm.get(w.id)||[],payouts:pm.get(w.id)||[]});
+  const open=wk.data.find(w=>!w.closed);
+  if(!open)throw new Error("No open week found. Re-run setup.sql.");
+  const history=wk.data.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
+  const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
+  state={attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct},week:mk(open),history,audit:au.data};
+  ui.offline=false;
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state}))}catch(e){}
+}
+async function refreshRender(){try{await loadAll()}catch(e){toast(errText(e))}render()}
+async function softRefresh(){
+  try{await loadAll()}catch(e){return}
+  if(document.querySelector(".overlay")){ui.dirty=true;return}
+  const a=document.activeElement;
+  if(a&&a.id==="q"&&$("#cardlist")){$("#cardlist").innerHTML=cardListHTML();return}
+  render();
+}
+function errText(e){
+  const m=String((e&&e.message)||e||"");
+  if(e&&e.code==="23505")return "That cert number is already in this week";
+  if(/fetch|network|Failed to/i.test(m))return "No connection. Try again when you are online.";
+  if(e&&e.code==="42501")return "You do not have access. Is your email on the members list?";
+  return m||"Something went wrong";
+}
+async function api(p){
+  let r;
+  try{r=await p}catch(e){toast(errText(e));return null}
+  if(r&&r.error){toast(errText(r.error));return null}
+  return r||{};
+}
+
+// ---------- realtime ----------
+function subscribe(){
+  if(rt||!sb)return;
+  rt=sb.channel("repack-live").on("postgres_changes",{event:"*",schema:"public"},()=>{clearTimeout(rtT);rtT=setTimeout(softRefresh,400)}).subscribe();
+}
+function teardown(){
+  clearTimeout(rtT);
+  if(rt&&sb){try{sb.removeChannel(rt)}catch(e){}}
+  rt=null;me=null;state=null;
+  try{localStorage.removeItem(CACHE_KEY)}catch(e){}
+}
+
+// ---------- calc ----------
+const payoutOf=c=>Math.round((+c.mv||0)*(+c.pct||0))/100;
+const cashIn=c=>c.saleType==="traded"?(+c.tradeCash||0):(+c.soldPrice||0);
+function calc(w){
+  const stock=w.cards.filter(c=>!c.sold),sold=w.cards.filter(c=>c.sold);
+  const mv=sum(stock,c=>c.mv),due=sum(stock,payoutOf),proceeds=sum(sold,cashIn);
+  const spent=sum(w.spend,x=>x.amount),paid=sum(w.payouts,x=>x.amount);
+  const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),ssp=sum(so,c=>c.soldPrice);
+  return{soldPct:smv>0?ssp/smv*100:null,stockN:stock.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
+}
+function pcalc(w,p){
+  const spent=sum(w.spend.filter(x=>x.partner===p),x=>x.amount);
+  const paid=sum(w.payouts.filter(x=>x.partner===p),x=>x.amount);
+  return{spent,paid,left:round2(spent-paid)};
+}
+const cardLabel=c=>(c.desc||"(no description)")+(c.cert?" | cert "+c.cert:"");
+const whoText=o=>{if(!o||!o.createdBy)return "";let s="Added by "+o.createdBy+" on "+fmtTime(o.createdAt);if(o.updatedAt&&o.updatedAt!==o.createdAt)s+=" | Last edited by "+o.updatedBy+" on "+fmtTime(o.updatedAt);return esc(s)};
+
+// ---------- csv ----------
+const csvCell=v=>{if(typeof v==="string"&&/^[=+@\t\r]/.test(v))v="'"+v;v=String(v==null?"":v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+const toCSV=rows=>"﻿"+rows.map(r=>r.map(csvCell).join(",")).join("\r\n");
+function parseCSV(t){
+  const rows=[];let r=[],f="",q=false;t=t.replace(/^﻿/,"");
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;
+    else if(c===","){r.push(f);f=""}
+    else if(c==="\n"||c==="\r"){if(c==="\r"&&t[i+1]==="\n")i++;r.push(f);rows.push(r);r=[];f=""}
+    else f+=c}
+  if(f!==""||r.length){r.push(f);rows.push(r)}
+  return rows.filter(r=>r.some(x=>x.trim()!==""));
+}
+const parseMoney=v=>{const n=parseFloat(String(v==null?"":v).replace(/[$,\s%]/g,""));return isFinite(n)?n:0};
+function parseDate(v){v=String(v||"").trim();let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+"-"+pad(m[2])+"-"+pad(m[3]);m=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(m){let y=+m[3];if(y<100)y+=2000;return y+"-"+pad(m[1])+"-"+pad(m[2])}return ""}
+
+async function exportFile(name,text,mime){
+  mime=mime||"text/csv";
+  const blob=new Blob([text],{type:mime});
+  try{
+    const file=new File([blob],name,{type:mime});
+    if(/iPhone|iPad|Android/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[file]})){
+      try{await navigator.share({files:[file],title:name});return}catch(e){if(e&&e.name==="AbortError")return}
+    }
+  }catch(e){}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+}
+const stampCols=o=>[o.createdBy||"",o.createdAt?fmtTime(o.createdAt):"",o.updatedBy||"",o.updatedAt?fmtTime(o.updatedAt):""];
+const CARD_HEAD=["Week","Date Purchased","PSA Cert #","Item Description","Owner","Market Value","Consignor %","Consignor Payout","Status","Sold Price / Trade Value","Cash Received","% of Market","Received In Trade For (Cert)","Sold Date","Notes","Photos","Added By","Added At","Last Edited By","Last Edited At"];
+const cardRows=(w,label)=>{const byId=new Map(w.cards.map(c=>[c.id,c]));return w.cards.map(c=>{const st=c.sold?(c.saleType==="traded"?"Traded":"Sold"):"In stock";const from=c.fromCardId&&byId.get(c.fromCardId);return [label,fmtDate(c.date),c.cert,c.desc,c.owner,round2(+c.mv||0),+c.pct||0,round2(payoutOf(c)),st,c.sold?round2(+c.soldPrice||0):"",c.sold?round2(cashIn(c)):"",c.sold&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null?round2(+c.soldPrice/+c.mv*100):"",from?from.cert:"",c.sold?fmtDate(c.soldDate):"",c.notes||"",attachN(c.id),...stampCols(c)]})};
+const MONEY_HEAD=["Week","Type","Partner","Amount","Date","Note","Added By","Added At","Last Edited By","Last Edited At"];
+const moneyRows=(w,label)=>[...w.spend.map(x=>[label,"Spend",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
+function summaryRows(w,label){
+  const t=calc(w);
+  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold",t.soldN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Profit",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Paid out","Left over"]];
+  state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.paid,c.left])});
+  return rows;
+}
+const fileTag=()=>todayISO();
+const weekLabelCurrent=()=>"Current week (started "+fmtDate(state.week.start)+")";
+
+// ---------- toast / modal ----------
+let toastT;
+function toast(msg){document.querySelectorAll(".toast").forEach(x=>x.remove());const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),3200)}
+function modal(html){closeModal();const o=document.createElement("div");o.className="overlay";o.innerHTML='<div class="sheet" role="dialog">'+html+"</div>";o.addEventListener("mousedown",e=>{if(e.target===o)closeModal()});document.body.appendChild(o);document.body.classList.add("noscroll");return o.firstChild}
+function closeModal(){stopCamera();document.querySelectorAll(".overlay").forEach(o=>o.remove());document.body.classList.remove("noscroll");if(ui.dirty){ui.dirty=false;softRefresh()}}
+function busy(form,on){form.querySelectorAll("button").forEach(b=>b.disabled=on)}
+
+// ---------- screens before sign-in ----------
+function renderSetup(){
+  $("#app").innerHTML='<div class="welcome"><h1>Repack Ledger</h1><p class="hint">This app needs your Supabase project. Paste the Project URL and the anon public key (Supabase dashboard, Project Settings, API). Or put them in config.js so every phone gets them automatically.</p><form id="cf0"><input name="url" placeholder="https://xxxx.supabase.co" autocomplete="off" required><input name="key" placeholder="anon public key" autocomplete="off" style="margin-top:8px" required><button class="btn block" style="margin-top:12px" type="submit">Save and continue</button></form></div>';
+  $("#cf0").addEventListener("submit",e=>{e.preventDefault();const f=e.target;try{localStorage.setItem(CFG_KEY,JSON.stringify({url:f.url.value.trim(),key:f.key.value.trim()}))}catch(x){}location.reload()});
+}
+function renderLogin(){
+  if(ui.denied){
+    $("#app").innerHTML='<div class="welcome"><h1>No access</h1><p class="hint">'+esc(ui.denied)+' is signed in but is not on the members list. Ask Alex to add this email, then sign in again.</p><button class="btn block" data-act="sign-out">Sign out</button></div>';return;
+  }
+  $("#app").innerHTML='<div class="welcome"><h1>Repack Ledger</h1><p class="hint">Sign in with your email and password.</p><form id="lf"><input name="email" type="email" autocomplete="username" placeholder="Email" required><input name="pw" type="password" autocomplete="current-password" placeholder="Password" style="margin-top:8px" required><button class="btn block" style="margin-top:12px" type="submit">Sign in</button></form><button class="btn sec block" data-act="forgot">Forgot password</button></div>';
+  const f=$("#lf");
+  f.addEventListener("submit",async e=>{
+    e.preventDefault();busy(f,true);
+    const {data,error}=await sb.auth.signInWithPassword({email:f.email.value.trim(),password:f.pw.value}).catch(x=>({error:x}));
+    if(error||!data||!data.session){busy(f,false);toast(error&&/invalid/i.test(error.message)?"Wrong email or password":errText(error));return}
+    await enter(data.session);
+  });
+}
+function renderNewPassword(){
+  $("#app").innerHTML='<div class="welcome"><h1>Set a new password</h1><form id="nf"><input name="p1" type="password" autocomplete="new-password" minlength="8" placeholder="New password (8+ characters)" required><input name="p2" type="password" autocomplete="new-password" minlength="8" placeholder="Confirm password" style="margin-top:8px" required><button class="btn block" style="margin-top:12px" type="submit">Save password</button></form></div>';
+  $("#nf").addEventListener("submit",async e=>{
+    e.preventDefault();const f=e.target;
+    if(f.p1.value!==f.p2.value){toast("Passwords do not match");return}
+    const r=await api(sb.auth.updateUser({password:f.p1.value}));if(!r)return;
+    ui.recovery=false;toast("Password saved");
+    const {data}=await sb.auth.getSession();if(data.session)await enter(data.session);else render();
+  });
+}
+async function enter(session){
+  try{
+    const email=(session.user.email||"").toLowerCase();
+    const m=await sb.from("members").select("name").eq("email",email).maybeSingle();
+    if(m.error)throw m.error;
+    if(!m.data){ui.denied=email;me=null;render();return}
+    ui.denied="";me={name:m.data.name,email};
+    await loadAll();subscribe();render();
+  }catch(e){
+    // offline fallback: show the last saved copy read-only
+    try{const c=JSON.parse(localStorage.getItem(CACHE_KEY));if(c&&c.state&&c.me&&c.me.email===(session.user.email||"").toLowerCase()){me=c.me;state=c.state;ui.offline=true;render();return}}catch(x){}
+    toast(errText(e));
+    me=null;render();
+  }
+}
+
+// ---------- rendering ----------
+function tile(label,val,sub,cls){return '<div class="tile"><span>'+esc(label)+'</span><b class="'+(cls||"")+'">'+val+"</b>"+(sub?"<small>"+sub+"</small>":"")+"</div>"}
+function dueBanner(){
+  if(ui.hist)return "";
+  const w=state.week;
+  if(!(w.cards.length||w.spend.length||w.payouts.length))return "";
+  const d=new Date();d.setHours(0,0,0,0);
+  d.setDate(d.getDate()-((d.getDay()-state.settings.resetDay+7)%7));
+  if(parseISO(w.start)>=d)return "";
+  return '<div class="banner"><span>A new week has started. Close out the last one and reset?</span><button class="btn sm" data-act="close-week">Close week</button></div>';
+}
+function render(){
+  if(!cfg()||!sb){renderSetup();return}
+  if(ui.recovery){renderNewPassword();return}
+  if(!me){renderLogin();return}
+  if(!state){$("#app").innerHTML='<div class="welcome"><p class="hint">Loading...</p></div>';return}
+  let title="Repack Ledger",sub="Week started "+fmtDate(state.week.start)+" | "+me.name,body="",back="";
+  if(ui.hist){const h=state.history.find(x=>x.id===ui.hist);if(h){title=h.label;sub=fmtDate(h.start)+" - "+fmtDate(h.end);body=histDetail(h);back='<button class="icon" data-act="back">Back</button>'}else ui.hist=null}
+  if(!ui.hist){body={cards:cardsView,money:moneyView,summary:summaryView,history:historyView,activity:activityView}[ui.tab]()}
+  const tabs=[["cards","Cards"],["money","Money"],["summary","Summary"],["history","History"],["activity","Activity"]];
+  $("#app").innerHTML='<header><div class="hl">'+back+"<div><h1>"+esc(title)+"</h1><p>"+esc(sub)+'</p></div></div><button class="icon" data-act="settings">Settings</button></header>'+(ui.offline?'<div class="banner"><span>Offline. Showing the last saved data. Reconnect to make changes.</span></div>':"")+dueBanner()+"<main>"+body+"</main>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
+  "<nav>"+tabs.map(t=>'<button data-act="tab" data-id="'+t[0]+'" class="'+(!ui.hist&&ui.tab===t[0]||ui.hist&&t[0]==="history"?"on":"")+'">'+t[1]+"</button>").join("")+"</nav>";
+}
+
+function cardRowHTML(c,edit,view){
+  const need=!c.desc||!(+c.mv),n=attachN(c.id);
+  let right,sub2;
+  if(c.sold&&c.saleType==="traded"){right=money(+c.soldPrice||0);sub2="trade value"+(+c.tradeCash?" | cash "+money(+c.tradeCash):"")}
+  else if(c.sold){const pm=(+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null)?" | "+round2(+c.soldPrice/+c.mv*100)+"% of market":"";right=money(+c.soldPrice||0);sub2="sale price"+pm}
+  else{right=money(+c.mv||0);sub2=(+c.pct||0)+"% = "+money(payoutOf(c))}
+  const act=edit==="sel"?"toggle-sel":edit?"edit-card":view?"view-card":"";
+  const pre=edit==="sel"?'<input type="checkbox" '+(ui.sel&&ui.sel.has(c.id)?"checked ":"")+(c.sold?"disabled ":"")+'tabindex="-1" style="pointer-events:none;margin:auto 12px auto 2px;flex:0 0 auto">':"";
+  return '<div class="row'+(act?"":" static")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+'>'+pre+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+"</div><div class=\"sub\">Cert "+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+" | "+esc(c.owner)+(c.updatedBy?" | "+esc(c.updatedBy):"")+(c.sold?' <span class="badge ok">'+(c.saleType==="traded"?"Traded":"Sold")+"</span>":"")+(c.fromCardId?' <span class="badge ok">Trade-in</span>':"")+(need&&!c.sold?' <span class="badge">Needs details</span>':"")+(n?' <span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+'</div></div><div class="amt"><div>'+right+'</div><div class="sub">'+sub2+"</div></div></div>";
+}
+function filteredCards(){
+  const q=ui.q.trim().toLowerCase();
+  return state.week.cards.filter(c=>{
+    if(ui.filter==="stock"&&c.sold)return false;
+    if(ui.filter==="sold"&&!c.sold)return false;
+    if(ui.filter==="need"&&(c.sold||(c.desc&&+c.mv)))return false;
+    return !q||(c.desc+" "+c.cert+" "+c.owner+" "+(c.notes||"")).toLowerCase().includes(q);
+  }).slice().reverse();
+}
+function cardListHTML(){const l=filteredCards();return l.length?l.map(c=>cardRowHTML(c,ui.sel?"sel":true)).join(""):'<div class="empty">No cards yet. Tap Scan certs or + Add card.</div>'}
+function cardsView(){
+  const t=calc(state.week);
+  const chips=[["all","All"],["stock","In stock"],["sold","Sold/Traded"],["need","Needs details"]];
+  return '<div class="tiles t3">'+tile("In stock",t.stockN,t.soldN?t.soldN+" sold or traded":"")+tile("Market value",money(t.mv))+tile("Payout due",money(t.due))+"</div>"+
+  '<div class="toolbar"><button class="btn" data-act="add-card">+ Add card</button><button class="btn" data-act="scan-certs">Scan certs</button><button class="btn sec" data-act="bulk">Bulk certs</button><button class="btn sec" data-act="sel-mode">Select / sell many</button><button class="btn sec" data-act="import-csv">Import CSV</button></div>'+
+  '<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'">'+
+  '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"</button>").join("")+"</div>"+
+  '<div id="cardlist">'+cardListHTML()+"</div>";
+}
+function ledgerList(list,kind){
+  if(!list.length)return '<div class="empty">Nothing yet.</div>';
+  return list.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>'<div class="row" data-act="edit-entry" data-kind="'+kind+'" data-id="'+x.id+'"><div class="main"><div class="desc">'+esc(x.partner)+'</div><div class="sub">'+fmtDate(x.date)+(x.note?" | "+esc(x.note):"")+(x.updatedBy?" | "+esc(x.updatedBy):"")+(attachN(x.id)?' <span class="badge ok">'+attachN(x.id)+" photo"+(attachN(x.id)>1?"s":"")+"</span>":"")+'</div></div><div class="amt"><b>'+money(+x.amount||0)+"</b></div></div>").join("");
+}
+const ACT_VERB={insert:"added",update:"edited",delete:"deleted"};
+const ACT_ENT={cards:"card",spend:"spend",payouts:"payout",weeks:"week",settings:"settings",attachments:"photo"};
+const COL_NAMES={description:"description",market_value:"market value",consignor_pct:"consignor %",sold_price:"sale price",sold_date:"sold date",date_purchased:"date",entry_date:"date",card_id:"card",split_done:"split done",reset_day:"reset day",default_pct:"default %",closed_by:"closed by",end_date:"end date",week_id:"week",sale_type:"how it left",trade_cash:"trade cash",from_card_id:"trade-in for"};
+const prettyDetail=s=>String(s||"").replace(/(^|; )([a-z_]+):/g,(m,a,k)=>a+(COL_NAMES[k]||k)+":");
+function activityView(){
+  const names=[...new Set(state.audit.map(a=>a.user_name))];
+  const list=state.audit.filter(a=>!ui.actUser||a.user_name===ui.actUser);
+  return '<div class="sec"><h3>Activity</h3><button class="btn sm sec" data-act="exp-audit">Export CSV</button></div><div class="chips"><button class="chip '+(!ui.actUser?"on":"")+'" data-act="act-user" data-id="">Everyone</button>'+names.map(n=>'<button class="chip '+(ui.actUser===n?"on":"")+'" data-act="act-user" data-id="'+esc(n)+'">'+esc(n)+"</button>").join("")+"</div>"+
+  (list.length?list.slice(0,200).map(a=>'<div class="row static"><div class="main"><div class="desc">'+esc(a.user_name)+" "+esc(ACT_VERB[a.action]||a.action)+(a.entity==="attachments"?" "+esc(a.item):(a.entity!=="settings"?" "+esc(ACT_ENT[a.entity]||a.entity):" settings")+(a.item&&a.entity!=="settings"?": "+esc(a.item):""))+'</div><div class="sub">'+esc(fmtTime(a.ts))+(a.detail?" | "+esc(prettyDetail(a.detail)):"")+"</div></div></div>").join("")+(list.length>=200?'<p class="hint">Showing the latest 200. Export CSV for everything.</p>':""):'<div class="empty">No activity yet.</div>');
+}
+function partnerTiles(w){return '<div class="grid2">'+state.settings.partners.map(p=>{const c=pcalc(w,p);return tile(p,money(c.left),"Left over | Spent "+money(c.spent)+" | Paid "+money(c.paid),c.left<0?"neg":"")}).join("")+"</div>"}
+function moneyView(){
+  const w=state.week;
+  return partnerTiles(w)+'<div class="sec"><h3>Spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">+ Add buy / spend</button></div>'+ledgerList(w.spend,"spend")+
+  '<div class="sec"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">+ Add payout</button></div>'+ledgerList(w.payouts,"payouts");
+}
+function tilesFor(t){
+  return '<div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock")+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Profit",money(t.profit),"payout + sales - spent",t.profit<0?"neg":"pos")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale price / market value on cash sales").replace('<div class="tile">','<div class="tile" style="grid-column:1/-1">')+"</div>";
+}
+function partnerTable(w){
+  return "<table><tr><th>Partner</th><th>Spent</th><th>Paid</th><th>Left</th></tr>"+state.settings.partners.map(p=>{const c=pcalc(w,p);return "<tr><td>"+esc(p)+"</td><td>"+money(c.spent)+"</td><td>"+money(c.paid)+"</td><td>"+money(c.left)+"</td></tr>"}).join("")+"</table>";
+}
+function exportButtons(id){
+  return '<div class="toolbar"><button class="btn sec" data-act="exp" data-kind="cards" data-id="'+id+'">Cards CSV</button><button class="btn sec" data-act="exp" data-kind="money" data-id="'+id+'">Money CSV</button><button class="btn sec" data-act="exp" data-kind="summary" data-id="'+id+'">Summary CSV</button></div>';
+}
+function summaryView(){
+  const w=state.week;
+  return tilesFor(calc(w))+'<div class="sec"><h3>Partners</h3></div>'+partnerTable(w)+'<div class="sec"><h3>Export this week</h3></div>'+exportButtons("current")+
+  '<div class="sec"><h3>End of week</h3></div><p class="hint">Saves this week to History for everyone, then clears cards, spend and payouts. Weeks reset on '+DAYS[state.settings.resetDay]+"s (change in Settings).</p><button class=\"btn block\" data-act=\"close-week\">Close week and start new</button>";
+}
+function historyView(){
+  const h=state.history;
+  let out='<div class="sec"><h3>Past weeks</h3></div>';
+  if(!h.length)out+='<div class="empty">No closed weeks yet. Use Close week on the Summary tab.</div>';
+  else out+=h.map(w=>{const t=calc(w);return '<div class="row" data-act="open-hist" data-id="'+w.id+'"><div class="main"><div class="desc">'+esc(w.label)+'</div><div class="sub">'+fmtDate(w.start)+" - "+fmtDate(w.end)+" | "+t.stockN+" in stock, "+t.soldN+' sold</div></div><div class="amt"><div>'+money(t.spent)+'</div><div class="sub">spent</div></div></div>'}).join("");
+  out+='<div class="sec"><h3>Export all history</h3></div><div class="toolbar"><button class="btn sec" data-act="exp-all" data-kind="summary">Weekly totals CSV</button><button class="btn sec" data-act="exp-all" data-kind="cards">All cards CSV</button><button class="btn sec" data-act="exp-all" data-kind="money">All money CSV</button></div>';
+  return out;
+}
+function ledgerStatic(w){
+  const all=[...w.spend.map(x=>({...x,k:"Spend"})),...w.payouts.map(x=>({...x,k:"Payout"}))];
+  if(!all.length)return '<div class="empty">Nothing recorded.</div>';
+  return all.map(x=>'<div class="row static"><div class="main"><div class="desc">'+esc(x.k)+" | "+esc(x.partner)+'</div><div class="sub">'+fmtDate(x.date)+(x.note?" | "+esc(x.note):"")+(x.updatedBy?" | "+esc(x.updatedBy):"")+'</div></div><div class="amt"><b>'+money(+x.amount||0)+"</b></div></div>").join("");
+}
+function histDetail(h){
+  return tilesFor(calc(h))+'<div class="sec"><h3>Partners</h3></div>'+partnerTable(h)+'<div class="sec"><h3>Export</h3></div>'+exportButtons(h.id)+
+  '<div class="sec"><h3>Cards ('+h.cards.length+")</h3></div>"+(h.cards.length?h.cards.slice().reverse().map(c=>cardRowHTML(c,false,true)).join(""):'<div class="empty">No cards.</div>')+
+  '<div class="sec"><h3>Money</h3></div>'+ledgerStatic(h)+
+  '<div class="actions"><button class="btn danger" data-act="del-hist" data-id="'+h.id+'">Delete this week</button></div>';
+}
+
+// ---------- scanning ----------
+let camStop=null;
+function stopCamera(){if(camStop){try{camStop()}catch(e){}camStop=null}}
+function normalizeCert(raw){
+  const s=String(raw||"").trim();
+  let m=s.match(/cert\/(\d{5,10})/i);if(m)return m[1];
+  m=s.match(/^\D*(\d{6,10})\D*$/);if(m)return m[1];
+  return s;
+}
+function beep(ok){
+  try{if(navigator.vibrate)navigator.vibrate(ok?40:[60,40,60]);
+    const A=window.AudioContext||window.webkitAudioContext;if(!A)return;
+    const c=new A(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);
+    o.frequency.value=ok?880:260;g.gain.value=.08;o.start();o.stop(c.currentTime+(ok?.09:.25));setTimeout(()=>c.close(),400);
+  }catch(e){}
+}
+let zxP=null;
+function loadZX(){
+  if(window.ZXing)return Promise.resolve();
+  if(!zxP)zxP=new Promise((res,rej)=>{const s=document.createElement("script");s.src="zxing.min.js";s.onload=res;s.onerror=()=>{zxP=null;rej(new Error("zx"))};document.head.appendChild(s)});
+  return zxP;
+}
+async function startCamera(video,onCode){
+  stopCamera();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast("Camera needs the app opened over https");return false}
+  let last="",lastT=0;
+  const emit=t=>{const n=Date.now();if(t===last&&n-lastT<2500)return;last=t;lastT=n;onCode(t)};
+  try{
+    if("BarcodeDetector" in window){
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+      video.srcObject=stream;await video.play();
+      const det=new BarcodeDetector();let on=true;
+      (async()=>{while(on){try{const r=await det.detect(video);if(r.length)emit(r[0].rawValue)}catch(e){}await new Promise(r=>setTimeout(r,200))}})();
+      camStop=()=>{on=false;stream.getTracks().forEach(t=>t.stop());video.srcObject=null};
+    }else{
+      await loadZX();
+      const reader=new ZXing.BrowserMultiFormatReader();
+      await reader.decodeFromConstraints({video:{facingMode:"environment"},audio:false},video,res=>{if(res)emit(res.getText())});
+      camStop=()=>reader.reset();
+    }
+    return true;
+  }catch(e){toast("Could not start the camera. Allow camera access and try again.");camStop=null;return false}
+}
+function newCardRow(o){return Object.assign({week_id:state.week.id},cardRow(Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,soldPrice:"",soldDate:"",notes:""},o)))}
+function scanModal(){
+  const added=[];
+  const el=modal('<h2>Scan certs</h2><p class="hint">Scan with a barcode scanner (it types the number and presses Enter), tap Use camera, or type a cert and press Enter. Each cert is saved for everyone right away; fill in details later.</p>'+
+    '<div class="two"><div>'+field("Owner",'<select id="scown">'+["Shared",...state.settings.partners].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" value="'+state.settings.defaultPct+'">')+"</div></div>"+
+    field("Cert number",'<div class="certrow"><input id="scin" class="scanin" inputmode="numeric" autocomplete="off" placeholder="Scan or type, then Enter"><button class="btn" id="scadd" type="button">Add</button></div>')+
+    '<video id="scv" class="video" playsinline muted hidden></video><div class="actions"><button class="btn sec" id="sccam" type="button">Use camera</button><button class="btn" data-act="close-modal" type="button">Done</button></div><div class="sec"><h3 id="sccount"></h3></div><div id="sclist"></div>');
+  const inp=$("#scin",el),vid=$("#scv",el);
+  const paint=()=>{$("#sccount",el).textContent=added.length?added.length+" added this session":"";$("#sclist",el).innerHTML=added.slice(0,10).map(c=>'<div class="row static"><div class="main"><div class="desc">'+esc(c)+'</div></div><div class="amt"><span class="badge ok">Saved</span></div></div>').join("")};
+  const pending=new Set();
+  const add=async raw=>{
+    const cert=normalizeCert(raw);if(!cert||pending.has(cert))return;
+    if(added.includes(cert)||state.week.cards.some(c=>c.cert===cert)){toast("Already in this week: "+cert);beep(false);return}
+    pending.add(cert);
+    const r=await api(sb.from("cards").insert(newCardRow({cert,owner:$("#scown",el).value,pct:+$("#scpct",el).value||state.settings.defaultPct})));
+    pending.delete(cert);
+    if(!r){beep(false);return}
+    added.unshift(cert);ui.dirty=true;beep(true);paint();
+  };
+  const submit=()=>{const v=inp.value;inp.value="";add(v);inp.focus()};
+  inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&inp.value.trim()){e.preventDefault();submit()}});
+  $("#scadd",el).addEventListener("click",submit);
+  $("#sccam",el).addEventListener("click",async()=>{
+    if(!vid.hidden){stopCamera();vid.hidden=true;$("#sccam",el).textContent="Use camera";return}
+    vid.hidden=false;
+    const ok=await startCamera(vid,add);
+    if(ok)$("#sccam",el).textContent="Stop camera";else vid.hidden=true;
+  });
+  paint();inp.focus();
+}
+
+// ---------- photos ----------
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const FK={cards:"card_id",spend:"spend_id",payouts:"payout_id"};
+function attachList(id){return (state&&state.attach&&id&&state.attach.get(id))||[]}
+function attachN(id){return attachList(id).length}
+const photoPaths=ids=>ids.flatMap(i=>attachList(i).map(a=>a.path));
+async function removeFiles(paths){if(paths.length){try{await sb.storage.from("receipts").remove(paths)}catch(e){}}}
+const urlCache=new Map();
+async function signedUrls(paths){
+  const need=paths.filter(p=>!urlCache.has(p)||urlCache.get(p).exp<Date.now()+60000);
+  if(need.length){const r=await sb.storage.from("receipts").createSignedUrls(need,3600);(r.data||[]).forEach(x=>{if(x.signedUrl)urlCache.set(x.path,{url:x.signedUrl,exp:Date.now()+3600000})})}
+  return paths.map(p=>urlCache.get(p)&&urlCache.get(p).url);
+}
+async function hydrateThumbs(box){
+  const imgs=[...box.querySelectorAll("img[data-path]")];if(!imgs.length)return;
+  let urls;try{urls=await signedUrls(imgs.map(i=>i.dataset.path))}catch(e){return}
+  imgs.forEach((im,i)=>{if(urls[i])im.src=urls[i]});
+}
+async function compressImage(file){
+  try{
+    const bmp=window.createImageBitmap?await createImageBitmap(file):await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)});
+    const w0=bmp.width||bmp.naturalWidth,h0=bmp.height||bmp.naturalHeight,k=Math.min(1,1600/Math.max(w0,h0));
+    const cv=document.createElement("canvas");cv.width=Math.max(1,Math.round(w0*k));cv.height=Math.max(1,Math.round(h0*k));
+    cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
+    const blob=await new Promise(res=>cv.toBlob(res,"image/jpeg",0.82));
+    if(!blob)throw new Error("blob");
+    return blob;
+  }catch(e){toast("Could not read that photo. Try a different one.");return null}
+}
+async function uploadPhotos(kind,entityId,blobs){
+  let ok=0;
+  for(const b of blobs){
+    const path=kind+"/"+entityId+"/"+uid()+".jpg";
+    if(!await api(sb.storage.from("receipts").upload(path,b,{contentType:"image/jpeg"})))continue;
+    const row={path};row[FK[kind]]=entityId;
+    if(await api(sb.from("attachments").insert(row)))ok++;else await removeFiles([path]);
+  }
+  return ok;
+}
+function openLightbox(a,canDelete,onDeleted){
+  const lb=document.createElement("div");lb.className="lightbox";
+  lb.innerHTML='<img alt="Photo"><div class="bar"><button class="btn sec" id="lbx">Close</button>'+(canDelete?'<button class="btn danger" id="lbd">Delete photo</button>':"")+"</div>";
+  document.body.appendChild(lb);
+  signedUrls([a.path]).then(u=>{if(u[0])$("img",lb).src=u[0]}).catch(()=>{});
+  $("#lbx",lb).onclick=()=>lb.remove();
+  lb.addEventListener("click",e=>{if(e.target===lb)lb.remove()});
+  const dl=$("#lbd",lb);
+  if(dl)dl.onclick=async()=>{
+    if(!confirm("Delete this photo for everyone?"))return;
+    if(await api(sb.from("attachments").delete().eq("id",a.id))){await removeFiles([a.path]);lb.remove();try{await loadAll()}catch(e){}if(onDeleted)onDeleted()}
+  };
+}
+const photoHTML=label=>"<label>"+label+'</label><div class="thumbs" id="thumbs"></div><div class="toolbar"><button type="button" class="btn sec sm" id="ph-camb">Take photo</button><button type="button" class="btn sec sm" id="ph-pickb">Choose photo</button></div><input type="file" id="ph-cam" accept="image/*" capture="environment" hidden><input type="file" id="ph-file" accept="image/*" multiple hidden>';
+function photoWidget(el,kind,entityId){
+  const pending=[];const box=$("#thumbs",el);
+  const paint=()=>{
+    box.innerHTML=attachList(entityId).map(a=>'<button type="button" class="thumb" data-aid="'+a.id+'"><img data-path="'+esc(a.path)+'" alt=""></button>').join("")+pending.map((p,i)=>'<button type="button" class="thumb" data-pend="'+i+'"><img src="'+p.url+'" alt=""><span class="x">x</span></button>').join("");
+    hydrateThumbs(box);
+  };
+  box.addEventListener("click",e=>{
+    const t=e.target.closest(".thumb");if(!t)return;
+    if(t.dataset.pend!==undefined){const [p]=pending.splice(+t.dataset.pend,1);try{URL.revokeObjectURL(p.url)}catch(x){}paint();return}
+    const a=attachList(entityId).find(x=>x.id===t.dataset.aid);if(a)openLightbox(a,true,paint);
+  });
+  const add=async files=>{for(const f of files){const b=await compressImage(f);if(b)pending.push({blob:b,url:URL.createObjectURL(b)})}paint()};
+  const fc=$("#ph-cam",el),fp=$("#ph-file",el);
+  $("#ph-camb",el).addEventListener("click",()=>{fc.value="";fc.click()});
+  $("#ph-pickb",el).addEventListener("click",()=>{fp.value="";fp.click()});
+  fc.addEventListener("change",()=>add([...fc.files]));fp.addEventListener("change",()=>add([...fp.files]));
+  paint();
+  const wd={add,pending,upload:async id=>{const n=await uploadPhotos(kind,id,pending.map(p=>p.blob));pending.length=0;return n}};
+  el.__photo=wd;return wd;
+}
+
+// ---------- card / entry modals ----------
+function field(label,inner){return "<label>"+label+"</label>"+inner}
+const dispOf=c=>!c.sold?"stock":(c.saleType==="traded"?"traded":"sold");
+function cardModal(id,carry){
+  const w=state.week,c=id?w.cards.find(x=>x.id===id):null;
+  if(id&&!c){toast("That card was changed or removed");return}
+  const d=c||Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,saleType:"",soldPrice:"",soldDate:"",tradeCash:"",notes:""},carry||{});
+  const dsp=dispOf(d);
+  const owners=["Shared",...state.settings.partners];
+  const P=state.settings.partners,splitable=!(c&&c.splitDone);
+  const dflt=d.owner===P[0]?100:d.owner===P[1]?0:50;
+  const recv=c?w.cards.filter(x=>x.fromCardId===c.id):[];
+  const fromC=d.fromCardId?w.cards.find(x=>x.id===d.fromCardId):null;
+  const pctMk=(d.sold&&+d.mv>0&&d.soldPrice!==""&&d.soldPrice!=null)?round2(+d.soldPrice/+d.mv*100):"";
+  const splitHTML=splitable?'<div class="two"><div>'+field("Split of the cash: "+esc(P[0])+" %",'<input name="split" type="number" step="1" min="0" max="100" value="'+dflt+'">')+'</div><div class="preview" id="spv" style="align-self:end"></div></div><label class="chk"><input type="checkbox" name="paynow" checked>Record partner payouts now</label>':'<p class="hint">Payouts for this card are already recorded. See the Money tab to adjust.</p>';
+  const recvHTML=dsp==="traded"&&c?'<p class="hint">'+(recv.length?"Received in this trade: "+recv.map(x=>esc(x.desc||("cert "+x.cert))).join(", "):"No received cards added yet.")+'</p><button type="button" class="btn sec sm" id="addrecv">Add received card</button>':'<p class="hint" id="recvhint">'+(c?"":"Save this card first, then add the cards you received.")+'</p><button type="button" class="btn sec sm" id="addrecv" style="display:'+(c?"inline-block":"none")+'">Add received card</button>';
+  const sel=v=>dsp===v?" selected":"";
+  const el=modal("<h2>"+(c?"Edit card":"Add card")+'</h2>'+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
+    field("PSA cert # (type, use a scanner, or tap Scan)",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button></div><video id="cv" class="video" playsinline muted hidden></video>')+
+    field("Date purchased",'<input type="date" name="date" value="'+esc(d.date)+'">')+
+    field("Description",'<input name="desc" placeholder="2023 Charizard ex PSA 10" value="'+esc(d.desc)+'">')+
+    '<div class="two"><div>'+field("Owner",'<select name="owner">'+owners.map(o=>"<option"+(o===d.owner?" selected":"")+">"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+esc(d.pct)+'">')+"</div></div>"+
+    field("Market value ($)",'<input name="mv" type="number" step="0.01" inputmode="decimal" value="'+esc(d.mv)+'">')+
+    '<div class="preview" id="pv"></div>'+
+    field("Status",'<select name="disp"><option value="stock"'+sel("stock")+'>In stock</option><option value="sold"'+sel("sold")+'>Sold for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
+    '<div id="outbox" style="display:'+(dsp==="stock"?"none":"block")+'">'+
+      '<div id="soldf" style="display:'+(dsp==="sold"?"block":"none")+'"><div class="two"><div>'+field("Sale price ($)",'<input name="soldPrice" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="sold"?d.soldPrice:"")+'">')+"</div><div>"+field("% of market value",'<input name="soldPctMk" type="number" step="0.1" inputmode="decimal" value="'+esc(pctMk)+'">')+'</div></div><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-pp="'+q+'">'+q+'%</button>').join("")+"</div></div>"+
+      '<div id="tradef" style="display:'+(dsp==="traded"?"block":"none")+'"><div class="two"><div>'+field("Trade value of this card ($)",'<input name="tradeValue" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="traded"?d.soldPrice:"")+'">')+"</div><div>"+field("Cash we received ($)",'<input name="tradeCash" type="number" step="0.01" inputmode="decimal" value="'+esc(d.tradeCash)+'">')+"</div></div>"+recvHTML+"</div>"+
+      field("Date",'<input type="date" name="soldDate" value="'+esc(d.soldDate)+'">')+splitHTML+
+    "</div>"+
+    field("Notes",'<input name="notes" value="'+esc(d.notes||"")+'">')+
+    photoHTML("Photos (the buy, the trade, proof of sale)")+
+    '<p class="hint">'+whoText(c)+"</p>"+
+    '<div class="actions"><button class="btn" type="submit">Save</button>'+(c?"":'<button class="btn sec" type="button" id="savenext">Save + next</button>')+'<button class="btn sec" type="button" data-act="close-modal">Cancel</button>'+(c?'<button class="btn danger" type="button" id="delc">Delete</button>':"")+"</div></form>");
+  const f=$("#cf",el);
+  const ph=photoWidget(el,"cards",id);
+  f.cert.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&f.cert.value.trim()){e.preventDefault();f.cert.value=normalizeCert(f.cert.value);f.desc.focus()}});
+  f.cert.addEventListener("change",()=>{f.cert.value=normalizeCert(f.cert.value)});
+  $("#certcam",el).addEventListener("click",async()=>{
+    const v=$("#cv",el);
+    if(!v.hidden){stopCamera();v.hidden=true;return}
+    v.hidden=false;
+    const ok=await startCamera(v,t=>{f.cert.value=normalizeCert(t);stopCamera();v.hidden=true;beep(true);f.desc.focus()});
+    if(!ok)v.hidden=true;
+  });
+  const cashNow=()=>f.disp.value==="sold"?(+f.soldPrice.value||0):f.disp.value==="traded"?(+f.tradeCash.value||0):0;
+  const pv=()=>{$("#pv",el).textContent="Payout: "+money(payoutOf({mv:f.mv.value,pct:f.pct.value}))};
+  const spv=()=>{
+    const e2=$("#spv",el);if(!e2||!f.split)return;
+    const cash=cashNow(),p=Math.min(100,Math.max(0,+f.split.value||0)),a=round2(cash*p/100);
+    e2.textContent=(f.disp.value==="traded"&&!cash)?"No cash in this trade, so no payout yet":P[0]+" "+money(a)+" | "+P[1]+" "+money(round2(cash-a));
+  };
+  const syncPct=()=>{const m=+f.mv.value||0;f.soldPctMk.value=(m>0&&f.soldPrice.value!=="")?round2(+f.soldPrice.value/m*100):""};
+  pv();
+  f.mv.addEventListener("input",()=>{pv();syncPct()});f.pct.addEventListener("input",pv);
+  f.soldPrice.addEventListener("input",()=>{syncPct();spv()});
+  f.soldPctMk.addEventListener("input",()=>{const m=+f.mv.value||0;if(m>0&&f.soldPctMk.value!==""){f.soldPrice.value=round2(m*+f.soldPctMk.value/100);spv()}});
+  f.tradeCash.addEventListener("input",spv);
+  el.querySelectorAll("[data-pp]").forEach(b=>b.addEventListener("click",()=>{f.soldPctMk.value=b.dataset.pp;f.soldPctMk.dispatchEvent(new Event("input"))}));
+  let splitTouched=false;
+  if(f.split){f.split.addEventListener("input",()=>{splitTouched=true;spv()});f.owner.addEventListener("change",()=>{if(!splitTouched){f.split.value=f.owner.value===P[0]?100:f.owner.value===P[1]?0:50;spv()}})}
+  f.disp.addEventListener("change",()=>{
+    const v=f.disp.value;
+    $("#outbox",el).style.display=v==="stock"?"none":"block";
+    $("#soldf",el).style.display=v==="sold"?"block":"none";
+    $("#tradef",el).style.display=v==="traded"?"block":"none";
+    if(v!=="stock"&&!f.soldDate.value)f.soldDate.value=todayISO();
+    spv();
+  });
+  spv();
+  const rb=$("#addrecv",el);
+  if(rb)rb.addEventListener("click",()=>{if(!c)return;closeModal();cardModal(null,{owner:c.owner,fromCardId:id,notes:"Received in trade for "+cardLabel(c)})});
+  const commit=async()=>{
+    const v=f.disp.value,isOut=v!=="stock";
+    const price=v==="sold"?f.soldPrice.value:v==="traded"?f.tradeValue.value:"";
+    const rec={date:f.date.value||todayISO(),cert:f.cert.value.trim(),desc:f.desc.value.trim(),owner:f.owner.value,mv:f.mv.value===""?"":+f.mv.value,pct:f.pct.value===""?state.settings.defaultPct:+f.pct.value,sold:isOut,saleType:isOut?v:"",soldPrice:price===""?"":+price,soldDate:isOut?f.soldDate.value:"",tradeCash:v==="traded"&&f.tradeCash.value!==""?+f.tradeCash.value:"",notes:f.notes.value.trim()};
+    let cardId=id;
+    if(id){if(!await api(sb.from("cards").update(cardRow(rec)).eq("id",id)))return null}
+    else{const r=await api(sb.from("cards").insert(Object.assign({week_id:w.id},cardRow(rec),d.fromCardId?{from_card_id:d.fromCardId}:{})).select("id").single());if(!r)return null;cardId=r.data.id}
+    const cash=v==="sold"?(+price||0):v==="traded"?(+f.tradeCash.value||0):0;
+    if(isOut&&f.paynow&&f.paynow.checked&&!(c&&c.splitDone)&&cash>0){
+      const p0=Math.min(100,Math.max(0,+f.split.value||0)),a0=round2(cash*p0/100),a1=round2(cash-a0);
+      const label=rec.desc||"cert "+rec.cert;
+      const rows=[[P[0],a0],[P[1],a1]].filter(x=>x[1]>0).map(([p,a])=>({week_id:w.id,partner:p,amount:a,entry_date:rec.soldDate||todayISO(),note:(v==="traded"?"Trade cash split (":"Sale split (")+p0+"/"+(100-p0)+"): "+label,card_id:cardId}));
+      if(rows.length){if(await api(sb.from("payouts").insert(rows)))await api(sb.from("cards").update({split_done:true}).eq("id",cardId))}
+    }
+    if(ph.pending.length)await ph.upload(cardId);
+    return rec;
+  };
+  f.addEventListener("submit",async e=>{e.preventDefault();busy(f,true);const r=await commit();if(r){closeModal();await refreshRender()}else busy(f,false)});
+  const sn=$("#savenext",el);
+  if(sn)sn.addEventListener("click",async()=>{if(!f.reportValidity())return;busy(f,true);const r=await commit();if(r){await loadAll().catch(()=>{});render();cardModal(null,{date:r.date,owner:r.owner,pct:r.pct,fromCardId:d.fromCardId||null});toast("Saved")}else busy(f,false)});
+  const dl=$("#delc",el);
+  if(dl)dl.addEventListener("click",async()=>{if(confirm("Delete this card?")){busy(f,true);const paths=photoPaths([id]);if(await api(sb.from("cards").delete().eq("id",id))){removeFiles(paths);closeModal();await refreshRender()}else busy(f,false)}});
+}
+function viewCardModal(id){
+  let c=null,wk=null;
+  for(const x of [state.week,...state.history]){const k=x.cards.find(y=>y.id===id);if(k){c=k;wk=x;break}}
+  if(!c)return;
+  const kv=(a,b)=>'<div class="kv"><span>'+esc(a)+"</span><span>"+b+"</span></div>";
+  const from=c.fromCardId&&wk.cards.find(y=>y.id===c.fromCardId);
+  const recv=wk.cards.filter(y=>y.fromCardId===c.id);
+  const el=modal("<h2>"+esc(c.desc||"(no description)")+"</h2>"+kv("Cert",esc(c.cert||"n/a"))+kv("Date purchased",fmtDate(c.date))+kv("Owner",esc(c.owner))+kv("Market value",money(+c.mv||0))+kv("Consignor rate",(+c.pct||0)+"% = "+money(payoutOf(c)))+
+    (c.sold?kv(c.saleType==="traded"?"Traded":"Sold",fmtDate(c.soldDate))+kv(c.saleType==="traded"?"Trade value":"Sale price",money(+c.soldPrice||0)+((+c.mv>0&&c.soldPrice!=="")?" ("+round2(+c.soldPrice/+c.mv*100)+"% of market)":""))+kv("Cash received",money(cashIn(c))):"")+
+    (from?kv("Received in trade for",esc(cardLabel(from))):"")+(recv.length?kv("Received in this trade",recv.map(y=>esc(y.desc||y.cert)).join(", ")):"")+(c.notes?kv("Notes",esc(c.notes)):"")+
+    '<label>Photos</label><div class="thumbs" id="thumbs"></div><p class="hint">'+whoText(c)+'</p><div class="actions"><button class="btn sec" data-act="close-modal">Close</button></div>');
+  const box=$("#thumbs",el),list=attachList(id);
+  box.innerHTML=list.length?list.map(a=>'<button type="button" class="thumb" data-aid="'+a.id+'"><img data-path="'+esc(a.path)+'" alt=""></button>').join(""):'<span class="hint">No photos.</span>';
+  hydrateThumbs(box);
+  box.addEventListener("click",e=>{const t=e.target.closest(".thumb");if(!t)return;const a=list.find(x=>x.id===t.dataset.aid);if(a)openLightbox(a,false)});
+}
+function bulkModal(){
+  const el=modal('<h2>Bulk add certs</h2><p class="hint">Paste PSA cert numbers, one per line or separated by commas or spaces. Fill in details later (they show as Needs details).</p><form id="bf"><textarea name="certs" rows="6" placeholder="124484639&#10;76806809"></textarea><div class="two"><div>'+field("Date",'<input type="date" name="date" value="'+todayISO()+'">')+"</div><div>"+field("Consignor %",'<input name="pct" type="number" step="0.1" value="'+state.settings.defaultPct+'">')+"</div></div>"+field("Owner",'<select name="owner">'+["Shared",...state.settings.partners].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+'<div class="actions"><button class="btn" type="submit">Add</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
+  $("#bf",el).addEventListener("submit",async e=>{
+    e.preventDefault();const f=e.target;
+    const certs=[...new Set(f.certs.value.split(/[\s,;]+/).map(normalizeCert).filter(Boolean))];
+    if(!certs.length){toast("Paste at least one cert number");return}
+    busy(f,true);
+    const rows=certs.map(cert=>newCardRow({cert,date:f.date.value||todayISO(),owner:f.owner.value,pct:+f.pct.value||state.settings.defaultPct}));
+    const r=await api(sb.from("cards").upsert(rows,{onConflict:"week_id,cert",ignoreDuplicates:true}).select("id"));
+    if(!r){busy(f,false);return}
+    const n=(r.data||[]).length;
+    closeModal();await refreshRender();toast(n+" added"+(certs.length-n?", "+(certs.length-n)+" duplicates skipped":""));
+  });
+}
+function entryModal(kind,id){
+  const w=state.week,list=w[kind],x=id?list.find(e=>e.id===id):null;
+  if(id&&!x){toast("That entry was changed or removed");return}
+  const d=x||{partner:state.settings.partners[0],amount:"",date:todayISO(),note:""};
+  const nm=kind==="spend"?"spend (a buy)":"payout";
+  const el=modal("<h2>"+(x?"Edit ":"Add ")+nm+'</h2><form id="ef">'+field("Partner",'<select name="partner">'+state.settings.partners.map(p=>"<option"+(p===d.partner?" selected":"")+">"+esc(p)+"</option>").join("")+"</select>")+
+    '<div class="two"><div>'+field("Amount ($)",'<input name="amount" type="number" step="0.01" inputmode="decimal" required value="'+esc(d.amount)+'">')+"</div><div>"+field("Date",'<input type="date" name="date" value="'+esc(d.date)+'">')+"</div></div>"+
+    field("Note",'<input name="note" placeholder="Zelle, cash, lot name" value="'+esc(d.note||"")+'">')+
+    photoHTML(kind==="spend"?"Photos of the buy (receipt, screenshots, the slabs)":"Photos (Zelle screenshot, receipt)")+
+    '<p class="hint">'+whoText(x)+"</p>"+
+    '<div class="actions"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button>'+(x?'<button class="btn danger" type="button" id="dele">Delete</button>':"")+"</div></form>");
+  const ph=photoWidget(el,kind,id);
+  $("#ef",el).addEventListener("submit",async e=>{
+    e.preventDefault();const f=e.target;busy(f,true);
+    const row={partner:f.partner.value,amount:+f.amount.value,entry_date:f.date.value||todayISO(),note:f.note.value.trim()};
+    let eid=id,r;
+    if(x)r=await api(sb.from(kind).update(row).eq("id",id));
+    else{r=await api(sb.from(kind).insert(Object.assign({week_id:w.id},row)).select("id").single());if(r)eid=r.data.id}
+    if(!r){busy(f,false);return}
+    if(ph.pending.length)await ph.upload(eid);
+    closeModal();await refreshRender();
+  });
+  const de=$("#dele",el);if(de)de.addEventListener("click",async()=>{if(confirm("Delete this entry?")){const paths=photoPaths([id]);if(await api(sb.from(kind).delete().eq("id",id))){removeFiles(paths);closeModal();await refreshRender()}}});
+}
+function selBar(){
+  const cs=state.week.cards.filter(c=>ui.sel.has(c.id)&&!c.sold);
+  return '<div style="height:64px"></div><div class="selbar"><div><b>'+cs.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sec sm" data-act="sel-all">All shown</button><button class="btn sm" data-act="sel-sell"'+(cs.length?"":" disabled")+'>Sell at %</button><button class="btn sec sm" data-act="sel-cancel">Cancel</button></div></div>';
+}
+function bulkSellModal(){
+  const P=state.settings.partners;
+  const cards=state.week.cards.filter(c=>ui.sel&&ui.sel.has(c.id)&&!c.sold);
+  if(!cards.length){toast("Select at least one in-stock card");return}
+  const totMv=sum(cards,c=>c.mv),noMv=cards.filter(c=>!(+c.mv>0)).length;
+  const el=modal("<h2>Sell "+cards.length+" cards</h2><p class=\"hint\">Market value of these cards: <b>"+money(totMv)+"</b>"+(noMv?" | "+noMv+" have no market value":"")+'</p><form id="bsf"><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-bp="'+q+'">'+q+'%</button>').join("")+'</div>'+
+    '<div class="two"><div>'+field("Sold at % of market",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="90">')+"</div><div>"+field("Or total price for the lot ($)",'<input name="total" type="number" step="0.01" inputmode="decimal">')+'</div></div><div class="preview" id="bsum"></div>'+
+    field("Sold date",'<input type="date" name="date" value="'+todayISO()+'">')+
+    field("Split of Shared cards: "+esc(P[0])+" %",'<input name="split" type="number" step="1" min="0" max="100" value="50">')+
+    '<p class="hint">Cards owned by one partner pay that partner in full. Only Shared cards use this split.</p><label class="chk"><input type="checkbox" name="paynow" checked>Record partner payouts now</label>'+
+    '<div class="actions"><button class="btn" type="submit">Mark sold</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
+  const f=$("#bsf",el);
+  const plan=()=>{
+    const tin=f.total.value!==""?+f.total.value:null,pct=+f.pct.value||0;
+    let prices;
+    if(tin!=null){
+      const wts=cards.map(c=>+c.mv||0),ws=wts.reduce((a,b)=>a+b,0);
+      prices=cards.map((c,i)=>round2(ws>0?tin*wts[i]/ws:tin/cards.length));
+      prices[prices.length-1]=round2(prices[prices.length-1]+round2(tin-prices.reduce((a,b)=>a+b,0)));
+    }else prices=cards.map(c=>round2((+c.mv||0)*pct/100));
+    const total=round2(prices.reduce((a,b)=>a+b,0)),sp=Math.min(100,Math.max(0,+f.split.value||0));
+    let a0=0;cards.forEach((c,i)=>{a0+=prices[i]*(c.owner===P[0]?1:c.owner===P[1]?0:sp/100)});
+    a0=round2(a0);
+    return{prices,total,a0,a1:round2(total-a0),eff:totMv>0?round2(total/totMv*100):null};
+  };
+  const paint=()=>{const r=plan();$("#bsum",el).textContent="Total "+money(r.total)+(r.eff!=null?" ("+r.eff+"% of market)":"")+" | "+P[0]+" "+money(r.a0)+" | "+P[1]+" "+money(r.a1)};
+  f.pct.addEventListener("input",()=>{f.total.value="";paint()});
+  f.total.addEventListener("input",()=>{const r=plan();if(f.total.value!==""&&r.eff!=null)f.pct.value=r.eff;paint()});
+  f.split.addEventListener("input",paint);
+  el.querySelectorAll("[data-bp]").forEach(b=>b.addEventListener("click",()=>{f.total.value="";f.pct.value=b.dataset.bp;paint()}));
+  paint();
+  f.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const r=plan(),date=f.date.value||todayISO(),rec=f.paynow.checked;
+    if(!(r.total>0)&&!confirm("The total is $0. Mark these cards sold anyway?"))return;
+    busy(f,true);
+    let ok=true;
+    for(let i=0;i<cards.length&&ok;i+=8){
+      const rs=await Promise.all(cards.slice(i,i+8).map((c,j)=>api(sb.from("cards").update({sold:true,sale_type:"sold",sold_price:r.prices[i+j],sold_date:date}).eq("id",c.id))));
+      if(rs.some(x=>!x))ok=false;
+    }
+    if(ok&&rec&&r.total>0){
+      const rows=[[P[0],r.a0],[P[1],r.a1]].filter(x=>x[1]>0).map(([pn,a])=>({week_id:state.week.id,partner:pn,amount:a,entry_date:date,note:"Bulk sale: "+cards.length+" cards"+(r.eff!=null?" at "+r.eff+"% of market":"")}));
+      if(rows.length&&await api(sb.from("payouts").insert(rows))){
+        for(let i=0;i<cards.length;i+=8)await Promise.all(cards.slice(i,i+8).map(c=>api(sb.from("cards").update({split_done:true}).eq("id",c.id))));
+      }
+    }
+    ui.sel=null;closeModal();await refreshRender();
+    toast(ok?cards.length+" cards sold for "+money(r.total):"Some cards could not be updated. Check the list.");
+  });
+}
+function closeWeekModal(){
+  const w=state.week,label="Week of "+fmtDate(w.start)+" - "+fmtDate(todayISO());
+  const t=calc(w);
+  const el=modal('<h2>Close this week</h2><p class="hint">Saves '+w.cards.length+" cards, "+w.spend.length+" spend and "+w.payouts.length+" payout entries to History for everyone (spent "+money(t.spent)+"), then resets.</p><form id=\"wf\">"+field("Name",'<input name="label" value="'+esc(label)+'">')+'<label class="chk"><input type="checkbox" name="carry">Carry over unsold cards to the new week</label><div class="actions"><button class="btn" type="submit">Close week</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
+  $("#wf",el).addEventListener("submit",async e=>{
+    e.preventDefault();const f=e.target;busy(f,true);
+    const r=await api(sb.rpc("close_week",{p_label:f.label.value.trim()||label,p_carry:f.carry.checked}));
+    if(!r){busy(f,false);return}
+    closeModal();ui.tab="history";await refreshRender();toast("Week saved to History");
+  });
+}
+function settingsModal(){
+  const s=state.settings;
+  const el=modal('<h2>Account</h2><p class="hint">Signed in as <b>'+esc(me.name)+"</b> | "+esc(me.email)+'</p><div class="toolbar"><button class="btn sec" data-act="change-pw">Change password</button><button class="btn sec" data-act="sign-out">Sign out</button></div><h2 style="margin-top:22px">Settings</h2><form id="sf"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>"<option value=\""+i+"\""+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div><div class="actions"><button class="btn" type="submit">Save settings</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>'+
+  '<h2 style="margin-top:22px">Backup</h2><p class="hint">Data lives in your shared database. This downloads a copy of everything as a file.</p><div class="toolbar"><button class="btn sec" data-act="backup">Export backup</button></div>');
+  $("#sf",el).addEventListener("submit",async e=>{
+    e.preventDefault();const f=e.target;const n0=f.p0.value.trim(),n1=f.p1.value.trim();
+    if(!n0||!n1||n0.toLowerCase()===n1.toLowerCase()||/^shared$/i.test(n0)||/^shared$/i.test(n1)){toast("Partner names must be different and not Shared");return}
+    busy(f,true);
+    const r=await api(sb.rpc("save_settings",{p_partners:[n0,n1],p_reset_day:+f.day.value,p_default_pct:+f.pct.value||90}));
+    if(!r){busy(f,false);return}
+    closeModal();await refreshRender();toast("Settings saved");
+  });
+}
+function passwordModal(){
+  const el=modal('<h2>Change password</h2><form id="pf">'+field("New password (8+ characters)",'<input name="p1" type="password" autocomplete="new-password" minlength="8" required>')+field("Confirm new password",'<input name="p2" type="password" autocomplete="new-password" minlength="8" required>')+'<div class="actions"><button class="btn" type="submit">Change password</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
+  $("#pf",el).addEventListener("submit",async e=>{
+    e.preventDefault();const f=e.target;
+    if(f.p1.value!==f.p2.value){toast("Passwords do not match");return}
+    busy(f,true);
+    if(await api(sb.auth.updateUser({password:f.p1.value}))){closeModal();toast("Password changed")}else busy(f,false);
+  });
+}
+
+// ---------- csv import ----------
+const PENDING_NOTE="Pending Triumph approval";
+async function importCSVText(text){
+  const rows=parseCSV(text);if(rows.length<2){toast("That file looks empty");return}
+  const H=rows[0].map(h=>h.trim().toLowerCase());
+  const g=(r,i)=>i>=0&&i<r.length?r[i]:"";
+  const owners=["Shared",...state.settings.partners];
+  const pickOwner=v=>owners.find(o=>o.toLowerCase()===String(v||"").trim().toLowerCase())||"Shared";
+  const byCert=new Map(state.week.cards.filter(c=>c.cert).map(c=>[c.cert,c]));
+
+  if(H.includes("cert id")&&H.includes("card title")){
+    // Triumph export
+    const X=n=>H.indexOf(n);
+    const iT=X("card title"),iC=X("cert id"),iG=X("grade"),iCo=X("grading company"),iM=X("market value"),iR=X("rate"),iO=X("owner"),iS=X("status"),iCS=X("card status"),iA=X("approved");
+    const seen=new Set(),items=[];let rejected=0;
+    rows.slice(1).forEach(r=>{
+      const cert=g(r,iC).trim(),title=g(r,iT).trim();
+      if(!cert&&!title)return;
+      if(cert&&seen.has(cert))return;if(cert)seen.add(cert);
+      const st=(g(r,iS)+" "+g(r,iCS)).toLowerCase();
+      if(/reject/.test(st)){rejected++;return}
+      const co=g(r,iCo).trim(),gr=g(r,iG).trim();
+      const tag=co&&gr?co+" "+gr:"";
+      const desc=title+(tag&&!title.toUpperCase().includes(tag.toUpperCase())?" "+tag:"");
+      items.push({cert,desc,mv:parseMoney(g(r,iM)),pct:g(r,iR)!==""?parseMoney(g(r,iR)):state.settings.defaultPct,owner:pickOwner(g(r,iO)),pending:/pending/.test(st)||/^no$/i.test(g(r,iA).trim())});
+    });
+    const fresh=items.filter(i=>!i.cert||!byCert.has(i.cert));
+    const upd=items.filter(i=>{const c=i.cert&&byCert.get(i.cert);return c&&(round2(+c.mv||0)!==round2(i.mv)||(+c.pct||0)!==i.pct||(c.notes===PENDING_NOTE&&!i.pending))});
+    const pendNew=fresh.filter(i=>i.pending).length;
+    let incl=true;
+    if(pendNew&&!confirm(pendNew+" new cards are still Pending approval on Triumph. Include them? OK = include (marked Pending), Cancel = skip them."))incl=false;
+    const add=fresh.filter(i=>incl||!i.pending);
+    if(!add.length&&!upd.length){toast("Nothing new. Everything in this file is already here.");return}
+    if(!confirm("Triumph import: "+add.length+" new cards"+(upd.length?", "+upd.length+" existing cards get updated market value or rate":"")+(rejected?" ("+rejected+" rejected rows ignored)":"")+". Continue?"))return;
+    toast("Importing...");
+    const rowsNew=add.map(i=>newCardRow({cert:i.cert,desc:i.desc,mv:i.mv,pct:i.pct,owner:i.owner,notes:i.pending?PENDING_NOTE:""}));
+    for(let k=0;k<rowsNew.length;k+=300){
+      if(!await api(sb.from("cards").upsert(rowsNew.slice(k,k+300),{onConflict:"week_id,cert",ignoreDuplicates:true})))return;
+    }
+    for(const i of upd){
+      const c=byCert.get(i.cert);
+      const patch={market_value:i.mv,consignor_pct:i.pct};
+      if(c.notes===PENDING_NOTE&&!i.pending)patch.notes="";
+      if(!await api(sb.from("cards").update(patch).eq("id",c.id)))break;
+    }
+    await refreshRender();toast(add.length+" added"+(upd.length?", "+upd.length+" updated":""));
+    return;
+  }
+
+  // generic CSV (this app's own exports and similar)
+  const ix=(...k)=>H.findIndex(h=>k.some(x=>h.includes(x)));
+  const I={date:ix("date purchased","date"),cert:ix("cert"),desc:ix("description","item","title"),owner:ix("owner"),mv:ix("market value","market"),pct:ix("%","rate"),status:ix("status"),sp:ix("sold price"),sd:ix("sold date"),notes:ix("note")};
+  if(I.cert<0&&I.desc<0){toast("Could not find Cert or Description columns");return}
+  const have=new Set(byCert.keys());
+  const out=[];let skipped=0;
+  rows.slice(1).forEach(r=>{
+    const cert=g(r,I.cert).trim(),desc=g(r,I.desc).trim();
+    if(!cert&&!desc)return;
+    if(cert&&have.has(cert)){skipped++;return}
+    if(cert)have.add(cert);
+    const pct=I.pct>=0&&g(r,I.pct)!==""?parseMoney(g(r,I.pct)):state.settings.defaultPct;
+    const sold=/sold|traded/i.test(g(r,I.status));
+    out.push(newCardRow({date:parseDate(g(r,I.date))||todayISO(),cert,desc,owner:pickOwner(g(r,I.owner)),mv:g(r,I.mv)===""?"":parseMoney(g(r,I.mv)),pct,sold,soldPrice:sold&&g(r,I.sp)!==""?parseMoney(g(r,I.sp)):"",soldDate:parseDate(g(r,I.sd)),notes:g(r,I.notes).trim()}));
+  });
+  if(!out.length){toast(skipped?"All "+skipped+" rows were already here":"No cards found");return}
+  if(!confirm("Import "+out.length+" cards"+(skipped?" ("+skipped+" duplicates skipped)":"")+"?"))return;
+  for(let i=0;i<out.length;i+=300){
+    if(!await api(sb.from("cards").upsert(out.slice(i,i+300),{onConflict:"week_id,cert",ignoreDuplicates:true})))return;
+  }
+  await refreshRender();toast(out.length+" cards imported");
+}
+
+// ---------- exports ----------
+function doExport(kind,id){
+  let w,label;
+  if(id==="current"){w=state.week;label=weekLabelCurrent()}else{w=state.history.find(x=>x.id===id);if(!w)return;label=w.label}
+  const tag=id==="current"?fileTag():w.start;
+  if(kind==="cards")exportFile("repack-cards-"+tag+".csv",toCSV([CARD_HEAD,...cardRows(w,label)]));
+  else if(kind==="money")exportFile("repack-money-"+tag+".csv",toCSV([MONEY_HEAD,...moneyRows(w,label)]));
+  else exportFile("repack-summary-"+tag+".csv",toCSV(summaryRows(w,label)));
+}
+function doExportAll(kind){
+  const weeks=[{w:state.week,label:weekLabelCurrent()},...state.history.map(h=>({w:h,label:h.label}))];
+  if(kind==="cards")exportFile("repack-all-cards-"+fileTag()+".csv",toCSV([CARD_HEAD,...weeks.flatMap(x=>cardRows(x.w,x.label))]));
+  else if(kind==="money")exportFile("repack-all-money-"+fileTag()+".csv",toCSV([MONEY_HEAD,...weeks.flatMap(x=>moneyRows(x.w,x.label))]));
+  else{
+    const P=state.settings.partners;
+    const head=["Week","Start","End","Cards in stock","Cards sold","Market value","Consignor payout","Sold proceeds","Spent","Paid out","Profit","Rate %",...P.flatMap(p=>[p+" spent",p+" paid",p+" left over"])];
+    const rows=weeks.map(x=>{const t=calc(x.w);return [x.label,fmtDate(x.w.start),x.w.end?fmtDate(x.w.end):"",t.stockN,t.soldN,t.mv,t.due,t.proceeds,t.spent,t.paid,t.profit,t.rate==null?"":round2(t.rate),...P.flatMap(p=>{const c=pcalc(x.w,p);return [c.spent,c.paid,c.left]})]});
+    exportFile("repack-weekly-totals-"+fileTag()+".csv",toCSV([head,...rows]));
+  }
+}
+async function exportAudit(){
+  let out=[],from=0;
+  try{for(;;){const {data,error}=await sb.from("audit").select("*").order("id",{ascending:false}).range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000}}catch(e){toast(errText(e));return}
+  exportFile("repack-activity-"+fileTag()+".csv",toCSV([["Time","User","Action","Type","Item","Details"],...out.map(a=>[fmtTime(a.ts),a.user_name,ACT_VERB[a.action]||a.action,ACT_ENT[a.entity]||a.entity,a.item,prettyDetail(a.detail)])]));
+}
+function backup(){exportFile("repack-backup-"+fileTag()+".json",JSON.stringify({exportedAt:new Date().toISOString(),exportedBy:me.name,settings:state.settings,week:state.week,history:state.history},null,1),"application/json")}
+
+// ---------- actions ----------
+const actions={
+  tab(id){ui.tab=id;ui.hist=null;ui.sel=null;render();window.scrollTo(0,0)},
+  "sel-mode"(){ui.sel=new Set();ui.filter="stock";render()},
+  "sel-cancel"(){ui.sel=null;render()},
+  "toggle-sel"(id){const c=state.week.cards.find(x=>x.id===id);if(!c||c.sold||!ui.sel)return;if(ui.sel.has(id))ui.sel.delete(id);else ui.sel.add(id);render()},
+  "sel-all"(){filteredCards().filter(c=>!c.sold).forEach(c=>ui.sel.add(c.id));render()},
+  "sel-sell"(){bulkSellModal()},
+  back(){ui.hist=null;render()},
+  filter(id){ui.filter=id;render()},
+  "add-card"(){cardModal(null)},
+  "edit-card"(id){cardModal(id)},
+  "view-card"(id){viewCardModal(id)},
+  bulk(){bulkModal()},
+  "scan-certs"(){scanModal()},
+  "import-csv"(){$("#csvin").value="";$("#csvin").click()},
+  "add-entry"(id,t){entryModal(t.dataset.kind,null)},
+  "edit-entry"(id,t){entryModal(t.dataset.kind,id)},
+  "close-week"(){closeWeekModal()},
+  settings(){settingsModal()},
+  "close-modal"(){closeModal()},
+  "open-hist"(id){ui.hist=id;render();window.scrollTo(0,0)},
+  async "del-hist"(id){if(confirm("Delete this saved week permanently for everyone? Export it first if you need it.")){const hw=state.history.find(h=>h.id===id);const paths=photoPaths(hw?[...hw.cards,...hw.spend,...hw.payouts].map(x=>x.id):[]);if(await api(sb.from("weeks").delete().eq("id",id))){removeFiles(paths);ui.hist=null;await refreshRender()}}},
+  exp(id,t){doExport(t.dataset.kind,id)},
+  "exp-all"(id,t){doExportAll(t.dataset.kind)},
+  "exp-audit"(){exportAudit()},
+  "act-user"(id){ui.actUser=id||"";render()},
+  backup(){backup()},
+  "change-pw"(){passwordModal()},
+  async "sign-out"(){closeModal();ui.denied="";try{await sb.auth.signOut()}catch(e){}teardown();render()},
+  async forgot(){
+    const f=$("#lf"),email=f&&f.email.value.trim();
+    if(!email){toast("Type your email first, then tap Forgot password");return}
+    const r=await api(sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname}));
+    if(r)toast("If that email is on the list, a reset link is on its way");
+  }
+};
+document.addEventListener("click",e=>{const t=e.target.closest("[data-act]");if(!t)return;const fn=actions[t.dataset.act];if(fn){e.preventDefault();fn(t.dataset.id,t,e)}});
+document.addEventListener("input",e=>{if(e.target.id==="q"){ui.q=e.target.value;$("#cardlist").innerHTML=cardListHTML()}});
+$("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importCSVText(String(r.result));r.readAsText(f)});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&sb&&me)softRefresh()});
+window.addEventListener("online",()=>{if(sb&&me)softRefresh()});
+
+// ---------- boot ----------
+async function boot(){
+  const c=cfg();
+  if(!c||!window.supabase){render();return}
+  sb=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  sb.auth.onAuthStateChange(ev=>{
+    if(ev==="PASSWORD_RECOVERY"){ui.recovery=true;setTimeout(render,0)}
+    if(ev==="SIGNED_OUT"&&me){teardown();setTimeout(render,0)}
+  });
+  let session=null;
+  try{const r=await sb.auth.getSession();session=r.data&&r.data.session}catch(e){}
+  if(ui.recovery){render();return}
+  if(session)await enter(session);else render();
+}
+boot();
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+</script>
+</body>
+</html>
