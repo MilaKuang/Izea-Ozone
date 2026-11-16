@@ -182,6 +182,38 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .btn.ico{flex:0 0 auto!important;width:48px;padding:0}
 .btn.ico.danger{border-width:1.5px}
 .scanopts{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.overlay.fullscan{align-items:stretch;background:#000;animation:none}
+.sheet.fullscan{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding:0;background:#000;position:relative;overflow:hidden;animation:fade .15s}
+.sheet.fullscan>.grab{display:none}
+.fs-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.fs-guide{position:absolute;left:13%;right:13%;top:18%;height:27%;border:3px solid rgba(255,255,255,.9);border-radius:22px;box-shadow:0 0 0 2000px rgba(0,0,0,.32);transition:border-color .15s,transform .15s;pointer-events:none}
+.fs-guide.hit{border-color:#22c55e;transform:scale(1.03)}
+.fs-msg{position:absolute;left:24px;right:24px;top:22%;color:#fff;text-align:center;z-index:2}
+.fs-msg p{margin:0 0 12px;font-size:15px}
+.fs-top{position:absolute;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;display:flex;align-items:center;gap:8px;color:#fff;z-index:4}
+.fs-top h2{flex:1;margin:0;font-size:17px;text-align:center;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.fs-ib{width:40px;height:40px;border-radius:99px;border:0;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
+.fs-chip{border:0;background:rgba(0,0,0,.5);color:#fff;border-radius:99px;padding:10px 12px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;max-width:46%;overflow:hidden;text-overflow:ellipsis}
+.fs-extra{position:absolute;left:12px;right:12px;top:calc(62px + env(safe-area-inset-top));z-index:5;background:var(--card);color:var(--ink);border-radius:18px;padding:4px 14px 14px;box-shadow:0 12px 30px rgba(0,0,0,.35)}
+#sctype{padding-top:14px}
+.fs-flash{position:absolute;left:50%;top:calc(45% + 16px);transform:translateX(-50%);background:rgba(17,24,39,.85);color:#fff;padding:9px 16px;border-radius:99px;font-size:14px;font-weight:600;white-space:nowrap;z-index:3;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+.fs-flash.show{opacity:1}.fs-flash.ok{background:#16a34a}.fs-flash.warn{background:#b45309}
+.fs-panel{position:absolute;left:0;right:0;bottom:0;background:var(--card);color:var(--ink);border-radius:22px 22px 0 0;padding:14px 14px calc(12px + env(safe-area-inset-bottom));z-index:4;box-shadow:0 -10px 30px rgba(0,0,0,.35)}
+.fs-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
+.fs-count b{font-size:26px;display:block;line-height:1.05;letter-spacing:-.02em}
+.fs-count span{font-size:12px;color:var(--mute)}
+.fs-snap{width:62px;height:62px;border-radius:99px;border:4px solid var(--acc);background:var(--acc-soft);color:var(--acc-soft-ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.fs-snap:active{transform:scale(.95)}
+.fullscan.busy .fs-snap{animation:pulse .8s infinite}
+.fs-tools{display:flex;gap:8px;margin-top:10px}
+.fs-list{max-height:30vh;overflow-y:auto;margin-top:8px;overscroll-behavior:contain}
+.fs-row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--line)}
+.fs-row .main{flex:1;min-width:0}
+.fs-row .desc{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fs-row .sub{font-size:12px;color:var(--mute);margin-top:1px}
+.fs-del{width:36px;height:36px;border-radius:99px;border:0;background:var(--chip);color:var(--neg);display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
+.fs-row.new{animation:rowin .35s ease-out}
+@keyframes rowin{from{background:rgba(34,197,94,.25)}to{background:transparent}}
 .actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
 .actions .btn{flex:1 1 auto}
 .preview{margin-top:10px;font-weight:600;background:var(--acc-soft);color:var(--acc-soft-ink);padding:9px 12px;border-radius:10px;font-size:14px}
@@ -375,7 +407,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=16;
+const APP_VERSION=17;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -480,7 +512,7 @@ function toast(msg){document.querySelectorAll(".toast").forEach(x=>x.remove());c
 function modal(html){closeModal();const o=document.createElement("div");o.className="overlay";o.innerHTML='<div class="sheet" role="dialog"><div class="grab"></div>'+html+"</div>";o.addEventListener("mousedown",e=>{if(e.target===o)closeModal()});document.body.appendChild(o);swipeClose(o,o.firstChild);document.body.classList.add("noscroll");return o.firstChild}
 function swipeClose(o,sh){
   let y0=null,x0=0,dy=0,t0=0,drag=false;
-  sh.addEventListener("touchstart",e=>{if(e.touches.length!==1||sh.scrollTop>0||e.target.closest("video,.chips,input[type=range]")){y0=null;return}y0=e.touches[0].clientY;x0=e.touches[0].clientX;t0=Date.now();dy=0;drag=false},{passive:true});
+  sh.addEventListener("touchstart",e=>{if(sh.classList.contains("fullscan")||e.touches.length!==1||sh.scrollTop>0||e.target.closest("video,.chips,input[type=range]")){y0=null;return}y0=e.touches[0].clientY;x0=e.touches[0].clientX;t0=Date.now();dy=0;drag=false},{passive:true});
   sh.addEventListener("touchmove",e=>{
     if(y0==null)return;const t=e.touches[0],d=t.clientY-y0;
     if(!drag){if(d>8&&Math.abs(d)>Math.abs(t.clientX-x0)&&sh.scrollTop<=0){drag=true;y0=t.clientY;t0=Date.now();sh.style.transition="none";sh.style.animation="none";const a=document.activeElement;if(a&&a.blur&&sh.contains(a))a.blur()}else if(d<-4||Math.abs(t.clientX-x0)>12){y0=null}return}
@@ -823,12 +855,12 @@ function zxHints(){
   return H;
 }
 const camHTML=id=>'<div class="camwrap" id="'+id+'w" hidden><video id="'+id+'" playsinline muted autoplay></video><div class="guide"></div><div class="camtip">Fit the QR code (back of the slab) or the barcode inside the box. Or tap the button to snap a photo.</div><button type="button" class="shutter" id="'+id+'snap" aria-label="Snap a photo and read it"></button></div>';
-async function startCamera(video,onCode){
+async function startCamera(video,onCode,quiet){
   stopCamera();
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast("Camera needs the app opened over https");return false}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){if(!quiet)toast("Camera needs the app opened over https");return false}
   let stream;
   try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false})}
-  catch(e){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false})}catch(e2){toast("Could not start the camera. Allow camera access in Settings and try again.");return false}}
+  catch(e){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false})}catch(e2){if(!quiet)toast("Could not start the camera. Allow camera access in Settings and try again.");return false}}
   video.setAttribute("playsinline","");video.muted=true;video.srcObject=stream;
   try{await video.play()}catch(e){}
   try{const tr=stream.getVideoTracks()[0],cap=tr.getCapabilities&&tr.getCapabilities();if(cap&&cap.focusMode&&cap.focusMode.includes("continuous"))await tr.applyConstraints({advanced:[{focusMode:"continuous"}]})}catch(e){}
@@ -899,33 +931,69 @@ async function readBarcodeFromImage(file){
 }
 function newCardRow(o){return Object.assign({week_id:state.week.id},cardRow(Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,soldPrice:"",soldDate:"",notes:""},o)))}
 function scanModal(){
-  const added=[];
-  const el=modal('<div class="ehead"><div class="thumbsm" style="width:48px;height:48px;background:var(--acc-soft);color:var(--acc-soft-ink)">'+ic("scan",22)+'</div><div><h2>Scan certs</h2><div class="hint">Each cert is saved for everyone right away</div></div></div>'+
-    '<div class="prow" style="margin:14px 0 4px"><button class="btn" id="sccam" type="button">'+ic("scan")+'<span>Camera</span></button><button class="btn sec" id="scphb" type="button">'+ic("camera")+'<span>Photo of label</span></button></div>'+
-    camHTML("scv")+'<input type="file" id="scph" accept="image/*" capture="environment" hidden>'+
-    '<div class="certrow" style="margin-top:8px"><input id="scin" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="Or type a cert number"><button class="btn sec" id="scadd" type="button">Add</button></div>'+
-    '<p class="tiny">A Bluetooth or USB barcode scanner works any time this screen is open.</p>'+
-    '<div class="sech"><h3>New cards get</h3></div><div class="formbox"><div class="two"><div>'+field("Owner",'<select id="scown">'+["Shared",...state.settings.partners].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label></div>'+
-    '<div class="sech"><h3 id="sccount">Added this session</h3></div><div id="sclist"></div>'+
-    '<div class="actions stick"><button class="btn block" data-act="close-modal" type="button">Done</button></div>');
-  const inp=$("#scin",el),vid=$("#scv",el);
-  const info={};let chain=Promise.resolve();
-  const paint=()=>{$("#sccount",el).textContent=added.length?added.length+" added this session":"Added this session";$("#sclist",el).innerHTML=added.length?"":'<p class="hint" style="margin:0 2px">Nothing yet. Scan a slab to start.</p>';if(!added.length)return;$("#sclist",el).innerHTML=added.slice(0,10).map(c=>{const x=info[c]||{};return '<div class="row static"><div class="main"><div class="desc">'+esc(x.title||c)+'</div>'+(x.title?'<div class="sub">Cert '+esc(c)+"</div>":"")+'</div><div class="amt"><span class="badge '+(x.st==="err"?"":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+"</span></div></div>"}).join("")};
-  $("#scpsa",el).addEventListener("change",e=>{try{localStorage.setItem("repack-psa-auto",e.target.checked?"1":"0")}catch(x){}});
-  const enrich=(id,cert)=>{info[cert]={st:"busy"};paint();chain=chain.then(async()=>{const r=await psaLookup(cert,true);if(r.error){info[cert]={st:"err"};if(r.setup){$("#scpsa",el).checked=false;toast(r.error)}}else{await psaAttach(id,r,true);info[cert]={st:"ok",title:r.title}}ui.dirty=true;if(el.isConnected)paint()})};
-  const pending=new Set();
+  const session=[],pending=new Set();
+  const owners=["Shared",...state.settings.partners];
+  const el=modal('<video id="scv" class="fs-video" playsinline muted autoplay></video><div class="fs-guide" id="scguide"></div>'+
+    '<div class="fs-msg" id="scmsg" hidden><p>Camera is off. Allow camera access, or use Photo of label or Type a cert.</p><button class="btn sm" id="scretry" type="button">Try camera again</button></div>'+
+    '<div class="fs-flash" id="scflash"></div>'+
+    '<div class="fs-top"><button class="fs-ib" data-act="close-modal" type="button" aria-label="Close">'+ic("plus",22).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+'</button><h2>Scan certs</h2><button class="fs-chip" id="scopt" type="button"></button></div>'+
+    '<div class="fs-extra" id="scopts" hidden><div class="two"><div>'+field("Owner",'<select id="scown">'+owners.map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label><button class="btn block sm" id="scoptok" type="button" style="margin-top:10px">Done</button></div>'+
+    '<div class="fs-extra" id="sctype" hidden><div class="certrow"><input id="scin" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="Type a cert number"><button class="btn" id="scadd" type="button">Add</button></div><p class="tiny">A Bluetooth or USB barcode scanner works without opening this.</p></div>'+
+    '<input type="file" id="scph" accept="image/*" capture="environment" hidden>'+
+    '<div class="fs-panel"><div class="fs-head"><div class="fs-count"><b id="sccount">0</b><span id="scsub">scanned</span></div><button class="fs-snap" id="scvsnap" type="button" aria-label="Snap a photo and read it">'+ic("camera",24)+'</button><div style="text-align:right"><button class="btn" data-act="close-modal" type="button">Done</button></div></div>'+
+    '<div class="fs-tools"><button class="chip" id="scphb" type="button">Photo of label</button><button class="chip" id="sctypeb" type="button">Type a cert</button></div><div class="fs-list" id="sclist"></div></div>');
+  el.classList.add("fullscan");el.parentNode.classList.add("fullscan");
+  const vid=$("#scv",el),inp=$("#scin",el),own=$("#scown",el),pct=$("#scpct",el),psaBox=$("#scpsa",el);
+  let flashT;
+  const flash=(msg,kind)=>{const f=$("#scflash",el);f.textContent=msg;f.className="fs-flash show "+(kind||"");clearTimeout(flashT);flashT=setTimeout(()=>{f.className="fs-flash"},1700)};
+  const hit=()=>{const g=$("#scguide",el);g.classList.add("hit");setTimeout(()=>g.classList.remove("hit"),700)};
+  const optLabel=()=>{$("#scopt",el).textContent=own.value+" | "+(+pct.value||state.settings.defaultPct)+"%"+(psaBox.checked?" | PSA":"")};
+  const paint=()=>{
+    const n=session.length,named=session.filter(x=>x.title).length;
+    $("#sccount",el).textContent=String(n);
+    $("#scsub",el).textContent=(n===1?"card":"cards")+" added";
+    $("#sclist",el).innerHTML=n?session.map(x=>'<div class="fs-row'+(x.fresh?" new":"")+'"><div class="main"><div class="desc">'+esc(x.title||"Cert "+x.cert)+'</div><div class="sub">'+(x.title?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+'</div></div><span class="badge '+(x.st==="err"?"ok":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+'</span><button class="fs-del" type="button" data-del="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",17)+"</button></div>").join(""):'<p class="hint" style="margin:8px 2px 2px">Point the camera at a slab. Each one is saved right away.</p>';
+    session.forEach(x=>{x.fresh=false});
+  };
+  let chain=Promise.resolve();
+  const enrich=item=>{item.st="busy";paint();chain=chain.then(async()=>{
+    if(!session.includes(item))return;
+    const r=await psaLookup(item.cert,true);
+    if(!session.includes(item))return;
+    if(r.error){item.st="err";if(r.setup&&psaBox.checked){psaBox.checked=false;try{localStorage.setItem("repack-psa-auto","0")}catch(x){}optLabel();flash("PSA lookup is off: "+(/approved/.test(r.error)?"PSA has not approved your account":"not set up"),"warn")}}
+    else{await psaAttach(item.id,r,true);item.title=r.title;item.st="ok"}
+    ui.dirty=true;if(el.isConnected)paint();
+  })};
   const add=async raw=>{
     const cert=normalizeCert(raw);if(!cert||pending.has(cert))return;
-    if(added.includes(cert)||state.week.cards.some(c=>c.cert===cert)){toast("Already in this week: "+cert);beep(false);return}
+    if(session.some(x=>x.cert===cert)){flash("Already scanned "+cert);return}
+    if(state.week.cards.some(c=>c.cert===cert)){beep(false);flash("Already in this week: "+cert,"warn");return}
     pending.add(cert);
-    const r=await api(sb.from("cards").insert(newCardRow({cert,owner:$("#scown",el).value,pct:+$("#scpct",el).value||state.settings.defaultPct})).select("id").single());
+    const r=await api(sb.from("cards").insert(newCardRow({cert,owner:own.value,pct:+pct.value||state.settings.defaultPct})).select("id").single());
     pending.delete(cert);
     if(!r){beep(false);return}
-    added.unshift(cert);ui.dirty=true;beep(true);paint();
-    if($("#scpsa",el).checked&&r.data&&r.data.id)enrich(r.data.id,cert);
+    const item={cert,id:r.data&&r.data.id,owner:own.value,title:"",st:"saved",fresh:true};
+    session.unshift(item);ui.dirty=true;beep(true);hit();flash("Added "+cert,"ok");paint();
+    if(psaBox.checked&&item.id)enrich(item);
   };
-  const submit=()=>{const v=inp.value;if(!v.trim()){inp.focus();return}const typing=document.activeElement===inp;inp.value="";add(v);if(typing)inp.focus()};
-  // hardware barcode scanners type the number and press Enter; catch that without opening the on-screen keypad
+  const remove=async cert=>{
+    const item=session.find(x=>x.cert===cert);if(!item)return;
+    let paths=[];try{const q=await sb.from("attachments").select("path").eq("card_id",item.id);paths=((q&&q.data)||[]).map(a=>a.path)}catch(e){}
+    if(!await api(sb.from("cards").delete().eq("id",item.id)))return;
+    removeFiles(paths);session.splice(session.indexOf(item),1);ui.dirty=true;paint();flash("Removed "+cert);
+  };
+  $("#sclist",el).addEventListener("click",e=>{const b=e.target.closest("[data-del]");if(b)remove(b.dataset.del)});
+  // typing
+  const submit=()=>{const v=inp.value;if(!v.trim()){inp.focus();return}inp.value="";add(v);inp.focus()};
+  inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&inp.value.trim()){e.preventDefault();submit()}});
+  $("#scadd",el).addEventListener("click",submit);
+  $("#sctypeb",el).addEventListener("click",()=>{$("#scopts",el).hidden=true;const t=$("#sctype",el);t.hidden=!t.hidden;if(!t.hidden)inp.focus();else inp.blur()});
+  // options
+  $("#scopt",el).addEventListener("click",()=>{$("#sctype",el).hidden=true;const o=$("#scopts",el);o.hidden=!o.hidden});
+  $("#scoptok",el).addEventListener("click",()=>{$("#scopts",el).hidden=true;optLabel()});
+  [own,pct].forEach(x=>x.addEventListener("change",optLabel));
+  psaBox.addEventListener("change",e=>{try{localStorage.setItem("repack-psa-auto",e.target.checked?"1":"0")}catch(x){}optLabel()});
+  // hardware barcode scanners type the number and press Enter; catch that without the on-screen keypad
   let kb="",kbT=0;
   const onKey=e=>{
     if(!el.isConnected){document.removeEventListener("keydown",onKey,true);return}
@@ -935,21 +1003,15 @@ function scanModal(){
     if(e.key&&e.key.length===1&&!e.metaKey&&!e.ctrlKey)kb+=e.key;
   };
   document.addEventListener("keydown",onKey,true);
-  inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&inp.value.trim()){e.preventDefault();submit()}});
-  $("#scadd",el).addEventListener("click",submit);
+  // photo of label and snap
   const scph=$("#scph",el);
-  const camw=$("#scvw",el);
-  const camBtn=on=>{$("#sccam",el).innerHTML=ic(on?"back":"scan")+"<span>"+(on?"Stop camera":"Camera")+"</span>"};
-  $("#scphb",el).addEventListener("click",()=>{stopCamera();camw.hidden=true;camBtn(false);scph.value="";scph.click()});
-  $("#scvsnap",el).addEventListener("click",async()=>{const c=await snapAndRead(vid,camw);if(c)add(c);else{beep(false);toast("No code found in that shot. Move a little closer and hold still.")}});
-  scph.addEventListener("change",async()=>{const file=scph.files[0];if(!file)return;toast("Reading barcode...");const c=await readBarcodeFromImage(file);if(c)add(c);else{beep(false);toast("No barcode found. Get closer to the label, or type the number.")}});
-  $("#sccam",el).addEventListener("click",async()=>{
-    if(!camw.hidden){stopCamera();camw.hidden=true;camBtn(false);return}
-    camw.hidden=false;
-    const ok=await startCamera(vid,add);
-    if(ok)camBtn(true);else camw.hidden=true;
-  });
-  paint();
+  $("#scphb",el).addEventListener("click",()=>{scph.value="";scph.click()});
+  scph.addEventListener("change",async()=>{const file=scph.files[0];if(!file)return;flash("Reading photo...");const c=await readBarcodeFromImage(file);if(c)add(c);else{beep(false);flash("No code found in that photo","warn")}});
+  $("#scvsnap",el).addEventListener("click",async()=>{if(!vid.srcObject){flash("Camera is off. Use Photo of label.","warn");return}flash("Reading...");const c=await snapAndRead(vid,el);if(c)add(c);else{beep(false);flash("No code found. Move closer and hold still.","warn")}});
+  // camera starts right away
+  const cam=async()=>{$("#scmsg",el).hidden=true;const ok=await startCamera(vid,add,true);if(!ok&&el.isConnected)$("#scmsg",el).hidden=false};
+  $("#scretry",el).addEventListener("click",cam);
+  optLabel();paint();cam();
 }
 
 // ---------- profile photos ----------
