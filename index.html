@@ -167,7 +167,21 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:12px;border:1px
 input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
 input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:10px;accent-color:var(--acc);box-shadow:none}
 .chk{display:flex;align-items:center;color:var(--ink);font-size:15px;margin:14px 0 4px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.two>div{min-width:0}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;min-height:46px;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1 1 0;min-width:0;border:0;background:transparent;border-radius:9px;padding:9px 2px;font-size:13.5px;font-weight:600;color:var(--ink2);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg button.on{background:var(--acc);color:var(--acc-ink)}
+.seg button.on[data-v=accepted]{background:var(--acc2-ink);color:var(--card)}
+.seg button.on[data-v=rejected]{background:var(--neg);color:var(--card)}
+.seg button.on[data-v=pending]{background:var(--warn-ink);color:var(--warn)}
+.seghint{font-size:12.5px;color:var(--mute);margin:6px 2px 0;min-height:1em}
+.hidesel{display:none!important}
+.btn.ico{flex:0 0 auto!important;width:48px;padding:0}
+.btn.ico.danger{border-width:1.5px}
+.scanopts{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
 .actions .btn{flex:1 1 auto}
 .preview{margin-top:10px;font-weight:600;background:var(--acc-soft);color:var(--acc-soft-ink);padding:9px 12px;border-radius:10px;font-size:14px}
@@ -361,7 +375,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=15;
+const APP_VERSION=16;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -626,7 +640,7 @@ function cardRowHTML(c,edit,view){
   const first=n?attachList(c.id)[0]:null;
   const th='<div class="thumbsm '+(first?"":oc)+'">'+(first?'<img data-path="'+esc(first.path)+'" alt="">':ic("cards",20))+"</div>";
   const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+REPACK[c.repack]+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"");
-  return '<div class="row'+(act?"":" static")+(picked?" picked":"")+(edit==="sel"&&c.sold?" dim":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
+  return '<div class="row'+(act?"":" static")+(picked?" picked":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
 function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
 function filteredCards(){
@@ -651,7 +665,7 @@ function cardsView(){
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
   return '<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>"+
-  (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select them.</span>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Set Triumph status</button>':"")+"</div>":
+  (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Triumph status</button>':"")+"</span></div>":
   '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Sell many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
@@ -886,14 +900,17 @@ async function readBarcodeFromImage(file){
 function newCardRow(o){return Object.assign({week_id:state.week.id},cardRow(Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,soldPrice:"",soldDate:"",notes:""},o)))}
 function scanModal(){
   const added=[];
-  const el=modal('<h2>Scan certs</h2><p class="hint">Scan with a barcode scanner (it types the number and presses Enter), tap Use camera, or type a cert and press Enter. Each cert is saved for everyone right away; fill in details later.</p>'+
-    '<div class="two"><div>'+field("Owner",'<select id="scown">'+["Shared",...state.settings.partners].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" value="'+state.settings.defaultPct+'">')+"</div></div>"+
-    field("Cert number",'<div class="certrow"><input id="scin" class="scanin" inputmode="numeric" autocomplete="off" placeholder="Scan or type, then Enter"><button class="btn" id="scadd" type="button">Add</button></div>')+
-    '<label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and slab photos</label>'+
-    camHTML("scv")+'<input type="file" id="scph" accept="image/*" capture="environment" hidden><div class="actions"><button class="btn sec" id="sccam" type="button">Use camera</button><button class="btn sec" id="scphb" type="button">Photo of label</button><button class="btn" data-act="close-modal" type="button">Done</button></div><div class="sech"><h3 id="sccount"></h3></div><div id="sclist"></div>');
+  const el=modal('<div class="ehead"><div class="thumbsm" style="width:48px;height:48px;background:var(--acc-soft);color:var(--acc-soft-ink)">'+ic("scan",22)+'</div><div><h2>Scan certs</h2><div class="hint">Each cert is saved for everyone right away</div></div></div>'+
+    '<div class="prow" style="margin:14px 0 4px"><button class="btn" id="sccam" type="button">'+ic("scan")+'<span>Camera</span></button><button class="btn sec" id="scphb" type="button">'+ic("camera")+'<span>Photo of label</span></button></div>'+
+    camHTML("scv")+'<input type="file" id="scph" accept="image/*" capture="environment" hidden>'+
+    '<div class="certrow" style="margin-top:8px"><input id="scin" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="Or type a cert number"><button class="btn sec" id="scadd" type="button">Add</button></div>'+
+    '<p class="tiny">A Bluetooth or USB barcode scanner works any time this screen is open.</p>'+
+    '<div class="sech"><h3>New cards get</h3></div><div class="formbox"><div class="two"><div>'+field("Owner",'<select id="scown">'+["Shared",...state.settings.partners].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label></div>'+
+    '<div class="sech"><h3 id="sccount">Added this session</h3></div><div id="sclist"></div>'+
+    '<div class="actions stick"><button class="btn block" data-act="close-modal" type="button">Done</button></div>');
   const inp=$("#scin",el),vid=$("#scv",el);
   const info={};let chain=Promise.resolve();
-  const paint=()=>{$("#sccount",el).textContent=added.length?added.length+" added this session":"";$("#sclist",el).innerHTML=added.slice(0,10).map(c=>{const x=info[c]||{};return '<div class="row static"><div class="main"><div class="desc">'+esc(x.title||c)+'</div>'+(x.title?'<div class="sub">Cert '+esc(c)+"</div>":"")+'</div><div class="amt"><span class="badge '+(x.st==="err"?"":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+"</span></div></div>"}).join("")};
+  const paint=()=>{$("#sccount",el).textContent=added.length?added.length+" added this session":"Added this session";$("#sclist",el).innerHTML=added.length?"":'<p class="hint" style="margin:0 2px">Nothing yet. Scan a slab to start.</p>';if(!added.length)return;$("#sclist",el).innerHTML=added.slice(0,10).map(c=>{const x=info[c]||{};return '<div class="row static"><div class="main"><div class="desc">'+esc(x.title||c)+'</div>'+(x.title?'<div class="sub">Cert '+esc(c)+"</div>":"")+'</div><div class="amt"><span class="badge '+(x.st==="err"?"":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+"</span></div></div>"}).join("")};
   $("#scpsa",el).addEventListener("change",e=>{try{localStorage.setItem("repack-psa-auto",e.target.checked?"1":"0")}catch(x){}});
   const enrich=(id,cert)=>{info[cert]={st:"busy"};paint();chain=chain.then(async()=>{const r=await psaLookup(cert,true);if(r.error){info[cert]={st:"err"};if(r.setup){$("#scpsa",el).checked=false;toast(r.error)}}else{await psaAttach(id,r,true);info[cert]={st:"ok",title:r.title}}ui.dirty=true;if(el.isConnected)paint()})};
   const pending=new Set();
@@ -907,21 +924,32 @@ function scanModal(){
     added.unshift(cert);ui.dirty=true;beep(true);paint();
     if($("#scpsa",el).checked&&r.data&&r.data.id)enrich(r.data.id,cert);
   };
-  const submit=()=>{const v=inp.value;inp.value="";add(v);inp.focus()};
+  const submit=()=>{const v=inp.value;if(!v.trim()){inp.focus();return}const typing=document.activeElement===inp;inp.value="";add(v);if(typing)inp.focus()};
+  // hardware barcode scanners type the number and press Enter; catch that without opening the on-screen keypad
+  let kb="",kbT=0;
+  const onKey=e=>{
+    if(!el.isConnected){document.removeEventListener("keydown",onKey,true);return}
+    const t=e.target;if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;
+    const now=Date.now();if(now-kbT>900)kb="";kbT=now;
+    if(e.key==="Enter"||e.key==="Tab"){if(kb.length>=5){e.preventDefault();add(kb)}kb="";return}
+    if(e.key&&e.key.length===1&&!e.metaKey&&!e.ctrlKey)kb+=e.key;
+  };
+  document.addEventListener("keydown",onKey,true);
   inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&inp.value.trim()){e.preventDefault();submit()}});
   $("#scadd",el).addEventListener("click",submit);
   const scph=$("#scph",el);
   const camw=$("#scvw",el);
-  $("#scphb",el).addEventListener("click",()=>{stopCamera();camw.hidden=true;$("#sccam",el).textContent="Use camera";scph.value="";scph.click()});
+  const camBtn=on=>{$("#sccam",el).innerHTML=ic(on?"back":"scan")+"<span>"+(on?"Stop camera":"Camera")+"</span>"};
+  $("#scphb",el).addEventListener("click",()=>{stopCamera();camw.hidden=true;camBtn(false);scph.value="";scph.click()});
   $("#scvsnap",el).addEventListener("click",async()=>{const c=await snapAndRead(vid,camw);if(c)add(c);else{beep(false);toast("No code found in that shot. Move a little closer and hold still.")}});
   scph.addEventListener("change",async()=>{const file=scph.files[0];if(!file)return;toast("Reading barcode...");const c=await readBarcodeFromImage(file);if(c)add(c);else{beep(false);toast("No barcode found. Get closer to the label, or type the number.")}});
   $("#sccam",el).addEventListener("click",async()=>{
-    if(!camw.hidden){stopCamera();camw.hidden=true;$("#sccam",el).textContent="Use camera";return}
+    if(!camw.hidden){stopCamera();camw.hidden=true;camBtn(false);return}
     camw.hidden=false;
     const ok=await startCamera(vid,add);
-    if(ok)$("#sccam",el).textContent="Stop camera";else camw.hidden=true;
+    if(ok)camBtn(true);else camw.hidden=true;
   });
-  paint();inp.focus();
+  paint();
 }
 
 // ---------- profile photos ----------
@@ -1101,26 +1129,32 @@ function cardModal(id,carry){
   const recvHTML=dsp==="traded"&&c?'<p class="hint">'+(recv.length?"Received in this trade: "+recv.map(x=>esc(x.desc||("cert "+x.cert))).join(", "):"No received cards added yet.")+'</p><button type="button" class="btn sec sm" id="addrecv">Add received card</button>':'<p class="hint" id="recvhint">'+(c?"":"Save this card first, then add the cards you received.")+'</p><button type="button" class="btn sec sm" id="addrecv" style="display:'+(c?"inline-block":"none")+'">Add received card</button>';
   const sel=v=>dsp===v?" selected":"";
   const fc=c&&attachList(c.id)[0];
-  const el=modal('<div class="ehead"><div class="thumbsm '+(fc?"":ownerCls(d.owner))+'" style="width:48px;height:48px">'+(fc?'<img data-path="'+esc(fc.path)+'" alt="">':ic("cards",22))+'</div><div><h2>'+(c?"Edit card":"Add card")+'</h2><div class="hint">'+(c?esc(c.desc||"Cert "+(c.cert||"n/a")):"Scan or type the cert to start")+"</div></div></div>"+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
+  const el=modal('<div class="ehead"><div class="thumbsm '+(fc?"":ownerCls(d.owner))+'" style="width:48px;height:48px">'+(fc?'<img data-path="'+esc(fc.path)+'" alt="">':ic("cards",22))+'</div><div style="min-width:0"><h2>'+(c?"Edit card":"Add card")+'</h2><div class="hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c?esc(c.desc||"Cert "+(c.cert||"n/a")):"Scan or type the cert to start")+"</div>"+(c?'<div class="pills" style="margin-top:4px"><span class="badge '+ownerCls(c.owner)+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):c.repack?'<span class="badge rp-'+c.repack+'">'+REPACK[c.repack]+"</span>":'<span class="badge ok">In stock</span>')+"</div>":"")+"</div></div>"+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
     '<div class="sech"><h3>Card</h3></div><div class="formbox">'+
     field("PSA cert #",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" placeholder="Type, scan, or tap Scan" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button><button type="button" class="btn sec" id="psab">PSA</button></div>'+camHTML("cv")+'<div id="camopts" class="hint" hidden><button class="linkbtn" id="certphb" type="button">Use the phone camera instead</button></div><input type="file" id="certph" accept="image/*" capture="environment" hidden><div class="psast" id="psast"></div>')+
     field("Description",'<input name="desc" placeholder="2023 Charizard ex PSA 10" value="'+esc(d.desc)+'">')+
     '<div class="two"><div>'+field("Date purchased",'<input type="date" name="date" value="'+esc(d.date)+'">')+"</div><div>"+field("Owner",'<select name="owner">'+owners.map(o=>"<option"+(o===d.owner?" selected":"")+">"+esc(o)+"</option>").join("")+"</select>")+"</div></div></div>"+
     '<div class="sech"><h3>Value</h3></div><div class="formbox"><div class="two"><div>'+field("Market value ($)",'<input name="mv" type="number" step="0.01" inputmode="decimal" value="'+esc(d.mv)+'">')+"</div><div>"+field("Consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+esc(d.pct)+'">')+'</div></div><div class="preview" id="pv"></div></div>'+
-    '<div class="sech"><h3>Status</h3></div><div class="formbox">'+(state.hasRepack?field("Triumph",'<select name="repack"><option value="">Not sent to Triumph</option>'+["pending","accepted","rejected"].map(k=>'<option value="'+k+'"'+(d.repack===k?" selected":"")+">"+REPACK[k]+(k==="accepted"?" (technically sold)":"")+"</option>").join("")+"</select>"):"")+
-    field("Status",'<select name="disp"><option value="stock"'+sel("stock")+'>Not sold to a customer</option><option value="sold"'+sel("sold")+'>Sold to a customer for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
+    '<div class="sech"><h3>Status</h3></div><div class="formbox">'+(state.hasRepack?field("Triumph",'<div class="seg" data-for="repack">'+[["","Not sent","Not sent to Triumph yet."],["pending","Pending","Sent to Triumph, waiting for approval."],["accepted","Accepted","Technically sold. Triumph owes the payout."],["rejected","Rejected","Triumph did not take it."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="repack" class="hidesel"><option value="">Not sent to Triumph</option>'+["pending","accepted","rejected"].map(k=>'<option value="'+k+'"'+(d.repack===k?" selected":"")+">"+REPACK[k]+"</option>").join("")+"</select>"):"")+
+    field("Customer sale",'<div class="seg" data-for="disp">'+[["stock","Not sold","Still ours (or with Triumph)."],["sold","Sold","Sold to a customer for cash."],["traded","Traded","Traded to a customer."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="disp" class="hidesel"><option value="stock"'+sel("stock")+'>Not sold to a customer</option><option value="sold"'+sel("sold")+'>Sold to a customer for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
     '<div id="outbox" style="display:'+(dsp==="stock"?"none":"block")+'">'+
       '<div id="soldf" style="display:'+(dsp==="sold"?"block":"none")+'"><div class="two"><div>'+field("Sale price ($)",'<input name="soldPrice" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="sold"?d.soldPrice:"")+'">')+"</div><div>"+field("% of market value",'<input name="soldPctMk" type="number" step="0.1" inputmode="decimal" value="'+esc(pctMk)+'">')+'</div></div><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-pp="'+q+'">'+q+'%</button>').join("")+"</div></div>"+
       '<div id="tradef" style="display:'+(dsp==="traded"?"block":"none")+'"><div class="two"><div>'+field("Trade value of this card ($)",'<input name="tradeValue" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="traded"?d.soldPrice:"")+'">')+"</div><div>"+field("Cash we received ($)",'<input name="tradeCash" type="number" step="0.01" inputmode="decimal" value="'+esc(d.tradeCash)+'">')+"</div></div>"+recvHTML+"</div>"+
       field("Date",'<input type="date" name="soldDate" value="'+esc(d.soldDate)+'">')+splitHTML+
     "</div>"+"</div>"+
-    '<div class="sech"><h3>Photos</h3></div><div class="formbox">'+photoHTML("Photos (the buy, the trade, proof of sale)")+"</div>"+
+    '<div class="sech"><h3>Photos</h3></div><div class="formbox">'+photoHTML("The buy, the trade, proof of sale")+"</div>"+
     '<div class="sech"><h3>Notes</h3></div><div class="formbox">'+field("Anything to remember",'<input name="notes" value="'+esc(d.notes||"")+'">')+"</div>"+
     (c?'<p class="hint" style="margin-top:12px">'+whoText(c)+"</p>":"")+
-    '<div class="actions stick"><button class="btn" type="submit">Save</button>'+(c?"":'<button class="btn sec" type="button" id="savenext">Save + next</button>')+'<button class="btn sec" type="button" data-act="close-modal">Cancel</button></div>'+(c?'<div class="delrow"><button class="linkbtn dz" type="button" id="delc">Delete this card</button></div>':"")+"</form>");
+    '<div class="actions stick"><button class="btn" type="submit">Save</button>'+(c?"":'<button class="btn sec" type="button" id="savenext">Save + next</button>')+'<button class="btn sec" type="button" data-act="close-modal">Cancel</button>'+(c?'<button class="btn danger ico" type="button" id="delc" aria-label="Delete this card">'+ic("trash")+"</button>":"")+"</div></form>");
   hydrateThumbs(el.querySelector(".ehead"));
   const f=$("#cf",el);
   const ph=photoWidget(el,"cards",id);
+  el.querySelectorAll(".seg").forEach(sg=>{
+    const sl=f[sg.dataset.for],hint=sg.nextElementSibling;
+    const paintSeg=()=>{let h="";sg.querySelectorAll("button").forEach(b=>{const on=b.dataset.v===sl.value;b.classList.toggle("on",on);if(on)h=b.dataset.h});if(hint&&hint.classList.contains("seghint"))hint.textContent=h};
+    sg.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;sl.value=b.dataset.v;sl.dispatchEvent(new Event("change",{bubbles:true}));paintSeg()});
+    sl.addEventListener("change",paintSeg);paintSeg();
+  });
   f.cert.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&f.cert.value.trim()){e.preventDefault();f.cert.value=normalizeCert(f.cert.value);f.desc.focus()}});
   f.cert.addEventListener("change",()=>{f.cert.value=normalizeCert(f.cert.value)});
   $("#psab",el).addEventListener("click",async()=>{
@@ -1252,8 +1286,18 @@ function entryModal(kind,id){
   const de=$("#dele",el);if(de)de.addEventListener("click",async()=>{if(confirm("Delete this entry?")){const paths=photoPaths([id]);if(await api(sb.from(kind).delete().eq("id",id))){removeFiles(paths);closeModal();await refreshRender()}}});
 }
 function selBar(){
-  const cs=state.week.cards.filter(c=>ui.sel.has(c.id)&&!c.sold);
-  return '<div class="selbar"><div><b>'+cs.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sec sm" data-act="sel-all">Select all</button><button class="btn sm" data-act="sel-sell"'+(cs.length?"":" disabled")+'>Sell at %</button><button class="btn sec sm" data-act="sel-cancel">Cancel</button></div></div>';
+  const all=state.week.cards.filter(c=>ui.sel.has(c.id)),cs=all.filter(c=>!c.sold);
+  return '<div class="selbar"><div><b>'+all.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sm" data-act="sel-sell"'+(cs.length?"":" disabled")+'>Sell at %</button><button class="btn sec sm" data-act="sel-del" aria-label="Delete selected"'+(all.length?"":" disabled")+' style="padding:6px 9px">'+ic("trash",18)+'</button><button class="btn sec sm" data-act="sel-cancel" aria-label="Done selecting" style="padding:6px 9px">'+ic("plus",18).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+"</button></div></div>";
+}
+function bulkDeleteModal(){
+  const ids=[...(ui.sel||[])].filter(id=>state.week.cards.some(c=>c.id===id));if(!ids.length){toast("Select at least one card");return}
+  const paths=photoPaths(ids),soldN=state.week.cards.filter(c=>ids.includes(c.id)&&c.sold).length;
+  const el=modal('<div class="dzic">'+ic("trash",26)+'</div><h2 class="center">Delete '+plural(ids.length,"card")+'?</h2><p class="hint center">Removes '+(ids.length===1?"it":"them")+" for everyone"+(paths.length?", along with "+plural(paths.length,"photo"):"")+". This cannot be undone."+(soldN?" "+soldN+" of these "+(soldN===1?"was":"were")+" sold, and any payouts already recorded stay in Money.":"")+'</p><div class="actions"><button class="btn dangerf" id="bdgo" type="button">'+ic("trash",18)+"Delete "+plural(ids.length,"card")+'</button><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  $("#bdgo",el).addEventListener("click",async()=>{
+    el.querySelectorAll("button").forEach(b=>b.disabled=true);let ok=0;
+    for(let k=0;k<ids.length;k+=8){const rs=await Promise.all(ids.slice(k,k+8).map(id=>api(sb.from("cards").delete().eq("id",id))));ok+=rs.filter(Boolean).length}
+    removeFiles(paths);ui.sel=null;closeModal();await refreshRender();toast(plural(ok,"card")+" deleted");
+  });
 }
 function bulkSellModal(){
   const P=state.settings.partners;
@@ -1527,8 +1571,9 @@ const actions={
   tab(id){ui.tab=id;ui.hist=null;ui.sel=null;ui.top=true;render()},
   "sel-mode"(){ui.sel=new Set();ui.filter="stock";render()},
   "sel-cancel"(){ui.sel=null;render()},
-  "toggle-sel"(id){const c=state.week.cards.find(x=>x.id===id);if(!c||c.sold||!ui.sel)return;if(ui.sel.has(id))ui.sel.delete(id);else ui.sel.add(id);render()},
-  "sel-all"(){filteredCards().filter(c=>!c.sold).forEach(c=>ui.sel.add(c.id));render()},
+  "toggle-sel"(id){const c=state.week.cards.find(x=>x.id===id);if(!c||!ui.sel)return;if(ui.sel.has(id))ui.sel.delete(id);else ui.sel.add(id);render()},
+  "sel-all"(){filteredCards().forEach(c=>ui.sel.add(c.id));render()},
+  "sel-del"(){bulkDeleteModal()},
   "sel-sell"(){bulkSellModal()},
   who(){whoModal()},
   "psa-fill"(){psaFillModal()},
@@ -1577,9 +1622,9 @@ document.addEventListener("pointermove",e=>{if(lp&&Math.hypot(e.clientX-lp.x,e.c
 document.addEventListener("contextmenu",e=>{if(e.target.closest(".row"))e.preventDefault()});
 function startQuickSelect(id){
   const c=state&&state.week.cards.find(x=>x.id===id);if(!c)return;
-  ui.sel=new Set(c.sold?[]:[id]);lpSuppress=true;setTimeout(()=>{lpSuppress=false},900);
+  ui.sel=new Set([id]);lpSuppress=true;setTimeout(()=>{lpSuppress=false},900);
   try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}
-  render();if(c.sold)toast("Sold cards cannot be selected. Pick in-stock cards.");
+  render();
 }
 document.addEventListener("click",e=>{if(lpSuppress&&e.target.closest("[data-act]")){lpSuppress=false;e.preventDefault();return}const t=e.target.closest("[data-act]");if(!t)return;const fn=actions[t.dataset.act];if(fn){e.preventDefault();fn(t.dataset.id,t,e)}});
 document.addEventListener("input",e=>{if(e.target.id==="q"){ui.q=e.target.value;paintList()}});
