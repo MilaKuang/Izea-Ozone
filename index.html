@@ -16,6 +16,7 @@
 :root{--bg:#f4f5f7;--card:#fff;--ink:#0b1324;--ink2:#334155;--mute:#6b7280;--line:#e6e8ec;--acc:#0d9488;--acc-ink:#fff;--acc-soft:#d5f5ef;--acc-soft-ink:#0f5f57;--neg:#dc2626;--pos:#059669;--chip:#eceef2;--warn:#fef3c7;--warn-ink:#92400e;--o0:#e8ebff;--o0-ink:#4338ca;--o1:#ffeedd;--o1-ink:#c2410c;--os:#eceef2;--os-ink:#475569;--sold:#dcfce7;--sold-ink:#166534;--trade:#f3e8ff;--trade-ink:#7e22ce;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);--hero1:#0f766e;--hero2:#123f3b;--acc2:#dbeafe;--acc2-ink:#1d4ed8;--rej:#fee2e2;--rej-ink:#b91c1c;--glass:rgba(244,245,247,.86);--navglass:rgba(255,255,255,.9)}
 @media(prefers-color-scheme:dark){:root{--bg:#090e18;--card:#111a2a;--ink:#e8ecf3;--ink2:#cbd5e1;--mute:#93a0b4;--line:#1d283b;--acc:#2dd4bf;--acc-ink:#03211f;--acc-soft:#0e2f2c;--acc-soft-ink:#5eead4;--neg:#f87171;--pos:#34d399;--chip:#1a2436;--warn:#382707;--warn-ink:#fcd34d;--o0:#1f1d4a;--o0-ink:#a5b4fc;--o1:#3a1e0c;--o1-ink:#fdba74;--os:#1a2436;--os-ink:#b6c2d4;--sold:#0f2e1c;--sold-ink:#86efac;--trade:#2a1640;--trade-ink:#d8b4fe;--shadow:none;--hero1:#0f5f58;--hero2:#0a2724;--acc2:#13264a;--acc2-ink:#93c5fd;--rej:#3b1414;--rej-ink:#fca5a5;--glass:rgba(9,14,24,.86);--navglass:rgba(17,26,42,.92)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 body.noscroll{overflow:hidden}
 b,.num{font-variant-numeric:tabular-nums}
@@ -188,6 +189,12 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .fs-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .fs-guide{position:absolute;left:13%;right:13%;top:18%;height:27%;border:3px solid rgba(255,255,255,.9);border-radius:22px;box-shadow:0 0 0 2000px rgba(0,0,0,.32);transition:border-color .15s,transform .15s;pointer-events:none}
 .fs-guide.hit{border-color:#22c55e;transform:scale(1.03)}
+.fs-guide span{position:absolute;left:0;right:0;bottom:-34px;text-align:center;color:#fff;font-size:13px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+.fs-tap{position:absolute;inset:0;z-index:1;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.camtap{position:absolute;inset:0;z-index:1;cursor:pointer}
+.camwrap .shutter{z-index:2}
+.shutterfx{position:absolute;inset:0;background:#fff;opacity:.75;z-index:6;pointer-events:none;animation:shut .35s ease-out forwards}
+@keyframes shut{to{opacity:0}}
 .fs-msg{position:absolute;left:24px;right:24px;top:22%;color:#fff;text-align:center;z-index:2}
 .fs-msg p{margin:0 0 12px;font-size:15px}
 .fs-top{position:absolute;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;display:flex;align-items:center;gap:8px;color:#fff;z-index:4}
@@ -196,7 +203,7 @@ input[type=date]::-webkit-date-and-time-value{text-align:left}
 .fs-chip{border:0;background:rgba(0,0,0,.5);color:#fff;border-radius:99px;padding:10px 12px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;max-width:46%;overflow:hidden;text-overflow:ellipsis}
 .fs-extra{position:absolute;left:12px;right:12px;top:calc(62px + env(safe-area-inset-top));z-index:5;background:var(--card);color:var(--ink);border-radius:18px;padding:4px 14px 14px;box-shadow:0 12px 30px rgba(0,0,0,.35)}
 #sctype{padding-top:14px}
-.fs-flash{position:absolute;left:50%;top:calc(45% + 16px);transform:translateX(-50%);background:rgba(17,24,39,.85);color:#fff;padding:9px 16px;border-radius:99px;font-size:14px;font-weight:600;white-space:nowrap;z-index:3;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+.fs-flash{position:absolute;left:50%;top:calc(45% + 44px);transform:translateX(-50%);background:rgba(17,24,39,.85);color:#fff;padding:9px 16px;border-radius:99px;font-size:14px;font-weight:600;white-space:nowrap;z-index:3;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;overflow:hidden;text-overflow:ellipsis}
 .fs-flash.show{opacity:1}.fs-flash.ok{background:#16a34a}.fs-flash.warn{background:#b45309}
 .fs-panel{position:absolute;left:0;right:0;bottom:0;background:var(--card);color:var(--ink);border-radius:22px 22px 0 0;padding:14px 14px calc(12px + env(safe-area-inset-bottom));z-index:4;box-shadow:0 -10px 30px rgba(0,0,0,.35)}
 .fs-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
@@ -347,9 +354,9 @@ function cfg(){
 
 // ---------- row mapping ----------
 const num=v=>v==null?"":+v;
-const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
+const mapCard=r=>({id:r.id,date:r.date_purchased||"",cert:r.cert||"",desc:r.description||"",owner:r.owner,mv:num(r.market_value),pct:+r.consignor_pct,sold:!!r.sold,soldPrice:num(r.sold_price),soldDate:r.sold_date||"",splitDone:!!r.split_done,saleType:r.sale_type||(r.sold?"sold":""),tradeCash:num(r.trade_cash),fromCardId:r.from_card_id||null,repack:r.repack_status||(r.notes==="Pending Triumph approval"?"pending":""),repacker:r.repacker||(r.repack_status||r.notes==="Pending Triumph approval"?"Triumph":""),repackDate:r.repack_date||"",notes:r.notes||"",createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
 const mapEntry=r=>({id:r.id,partner:r.partner,amount:+r.amount,date:r.entry_date||"",note:r.note||"",cardId:r.card_id,createdBy:r.created_by,createdAt:r.created_at,updatedBy:r.updated_by,updatedAt:r.updated_at});
-const cardRow=r=>{const o=cardRow0(r);if(state&&state.hasRepack){o.repack_status=r.repack||null;o.repack_date=r.repack?(r.repackDate||todayISO()):null}return o};
+const cardRow=r=>{const o=cardRow0(r);if(state&&state.hasRepack){o.repack_status=r.repack||null;o.repack_date=r.repack?(r.repackDate||todayISO()):null}if(state&&state.hasRepacker)o.repacker=r.repack?(r.repacker||state.settings.repackers[0]):null;return o};
 const cardRow0=r=>({date_purchased:r.date||null,cert:r.cert||null,description:r.desc||"",owner:r.owner,market_value:r.mv===""?null:+r.mv,consignor_pct:+r.pct,sold:!!r.sold,sale_type:r.sold?(r.saleType||"sold"):null,sold_price:(r.soldPrice===""||r.soldPrice==null)?null:+r.soldPrice,sold_date:r.soldDate||null,trade_cash:(r.sold&&r.saleType==="traded"&&r.tradeCash!==""&&r.tradeCash!=null)?+r.tradeCash:null,notes:r.notes||""});
 
 async function fetchAll(table,order){
@@ -364,13 +371,14 @@ async function fetchAll(table,order){
   return out;
 }
 async function loadAll(){
-  const [st,wk,cd,sp,po,at,au,mb,rp]=await Promise.all([
+  const [st,wk,cd,sp,po,at,au,mb,rp,rq]=await Promise.all([
     sb.from("settings").select("*").eq("id",1).single(),
     sb.from("weeks").select("*").order("start_date",{ascending:true}),
     fetchAll("cards"),fetchAll("spend"),fetchAll("payouts"),fetchAll("attachments","created_at"),
     sb.from("audit").select("*").order("id",{ascending:false}).limit(300),
     sb.from("members").select("*"),
-    sb.from("cards").select("repack_status").limit(1)
+    sb.from("cards").select("repack_status").limit(1),
+    sb.from("cards").select("repacker").limit(1)
   ]);
   for(const r of [st,wk,au])if(r.error)throw r.error;
   const by=(rows,map)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.week_id))m.set(r.week_id,[]);m.get(r.week_id).push(map(r))});return m};
@@ -380,7 +388,7 @@ async function loadAll(){
   if(!open)throw new Error("No open week found. Re-run setup.sql.");
   const history=wk.data.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
   const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
-  state={hasRepack:!!(rp&&!rp.error),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct},week:mk(open),history,audit:au.data};
+  state={hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
   ui.offline=false;
   try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state}))}catch(e){}
 }
@@ -407,7 +415,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=17;
+const APP_VERSION=19;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -452,8 +460,9 @@ function calc(w){
   const mv=sum(stock,c=>c.mv),due=sum(stock,payoutOf),proceeds=sum(sold,cashIn);
   const spent=sum(w.spend,x=>x.amount),paid=sum(w.payouts,x=>x.amount);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),ssp=sum(so,c=>c.soldPrice);
-  const acc=stock.filter(c=>c.repack==="accepted"),pend=stock.filter(c=>c.repack==="pending");
-  return{accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
+  const acc=stock.filter(c=>c.repack==="accepted"),pend=stock.filter(c=>c.repack==="pending"),accBy={};
+  acc.forEach(c=>{const n=c.repacker||"Repacker";accBy[n]=round2((accBy[n]||0)+payoutOf(c))});
+  return{accBy,accN:acc.length,accDue:sum(acc,payoutOf),pendN:pend.length,pendDue:sum(pend,payoutOf),soldPct:smv>0?ssp/smv*100:null,stockN:stock.length-acc.length,soldN:sold.length,tradedN:sold.filter(c=>c.saleType==="traded").length,mv,due,proceeds,spent,paid,profit:round2(due+proceeds-spent),rate:mv>0?spent/mv*100:null};
 }
 function pcalc(w,p){
   const spent=sum(w.spend.filter(x=>x.partner===p),x=>x.amount);
@@ -493,13 +502,13 @@ async function exportFile(name,text,mime){
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
 }
 const stampCols=o=>[o.createdBy||"",o.createdAt?fmtTime(o.createdAt):"",o.updatedBy||"",o.updatedAt?fmtTime(o.updatedAt):""];
-const CARD_HEAD=["Week","Date Purchased","PSA Cert #","Item Description","Owner","Market Value","Consignor %","Consignor Payout","Status","Triumph Status","Sold Price / Trade Value","Cash Received","% of Market","Received In Trade For (Cert)","Sold Date","Notes","Photos","Added By","Added At","Last Edited By","Last Edited At"];
-const cardRows=(w,label)=>{const byId=new Map(w.cards.map(c=>[c.id,c]));return w.cards.map(c=>{const st=c.sold?(c.saleType==="traded"?"Traded":"Sold"):"In stock";const from=c.fromCardId&&byId.get(c.fromCardId);return [label,fmtDate(c.date),c.cert,c.desc,c.owner,round2(+c.mv||0),+c.pct||0,round2(payoutOf(c)),st,c.repack?REPACK[c.repack]:"",c.sold?round2(+c.soldPrice||0):"",c.sold?round2(cashIn(c)):"",c.sold&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null?round2(+c.soldPrice/+c.mv*100):"",from?from.cert:"",c.sold?fmtDate(c.soldDate):"",c.notes||"",attachN(c.id),...stampCols(c)]})};
+const CARD_HEAD=["Week","Date Purchased","PSA Cert #","Item Description","Owner","Market Value","Consignor %","Consignor Payout","Status","Repacker","Repacker Status","Sold Price / Trade Value","Cash Received","% of Market","Received In Trade For (Cert)","Sold Date","Notes","Photos","Added By","Added At","Last Edited By","Last Edited At"];
+const cardRows=(w,label)=>{const byId=new Map(w.cards.map(c=>[c.id,c]));return w.cards.map(c=>{const st=c.sold?(c.saleType==="traded"?"Traded":"Sold"):"In stock";const from=c.fromCardId&&byId.get(c.fromCardId);return [label,fmtDate(c.date),c.cert,c.desc,c.owner,round2(+c.mv||0),+c.pct||0,round2(payoutOf(c)),st,c.repack?c.repacker:"",c.repack?({pending:"Pending",accepted:"Accepted",rejected:"Rejected"})[c.repack]:"",c.sold?round2(+c.soldPrice||0):"",c.sold?round2(cashIn(c)):"",c.sold&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null?round2(+c.soldPrice/+c.mv*100):"",from?from.cert:"",c.sold?fmtDate(c.soldDate):"",c.notes||"",attachN(c.id),...stampCols(c)]})};
 const MONEY_HEAD=["Week","Type","Partner","Amount","Date","Note","Added By","Added At","Last Edited By","Last Edited At"];
 const moneyRows=(w,label)=>[...w.spend.map(x=>[label,"Spend",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)]),...w.payouts.map(x=>[label,"Payout",x.partner,round2(+x.amount||0),fmtDate(x.date),x.note||"",...stampCols(x)])];
 function summaryRows(w,label){
   const t=calc(w);
-  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by Triumph",t.accN],["Accepted payout (Triumph owes)",t.accDue],["Pending at Triumph",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Profit",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Paid out","Left over"]];
+  const rows=[["Week",label],["Cards in stock",t.stockN],["Cards sold to customers",t.soldN],["Accepted by repackers",t.accN],["Accepted payout (repackers owe)",t.accDue],...Object.entries(t.accBy).map(([n,v])=>[n+" owes",v]),["Pending at repackers",t.pendN],["Total market value",t.mv],["Total consignor payout",t.due],["Sold proceeds",t.proceeds],["Total spent",t.spent],["Total paid out",t.paid],["Profit",t.profit],["Rate (spent / market value %)",t.rate==null?"":round2(t.rate)],["Average sold % of market",t.soldPct==null?"":round2(t.soldPct)],[],["Partner","Spent","Paid out","Left over"]];
   state.settings.partners.forEach(p=>{const c=pcalc(w,p);rows.push([p,c.spent,c.paid,c.left])});
   return rows;
 }
@@ -604,7 +613,9 @@ const ownerCls=o=>{const P=state.settings.partners;return o===P[0]?"o0":o===P[1]
 const daysIn=c=>{if(!c.date)return null;const d=Math.round((parseISO(todayISO())-parseISO(c.date))/864e5);return d>=0?d:null};
 const AVC=["#6366f1","#f97316","#0d9488","#e11d48","#0ea5e9","#a855f7"];
 const avColor=n=>{let h=0;for(const ch of String(n||""))h=(h*31+ch.charCodeAt(0))>>>0;return AVC[h%AVC.length]};
-const REPACK={pending:"Pending at Triumph",accepted:"Accepted by Triumph",rejected:"Rejected by Triumph"};
+const REPACK={pending:"Pending at repacker",accepted:"Accepted by repacker",rejected:"Rejected by repacker"};
+const RPV={pending:"Pending at",accepted:"Accepted by",rejected:"Rejected by"};
+const rpLabel=(c,st,who)=>{const v=st||c.repack;return v?RPV[v]+" "+(who||c.repacker||"repacker"):""};
 const plural=(n,w)=>n+" "+w+(n===1?"":"s");
 function memberOf(name){return ((state&&state.members)||[]).find(m=>m.name===name)}
 function avatarHTML(name,size){
@@ -664,14 +675,14 @@ function cardRowHTML(c,edit,view){
   let right,sub2;
   if(c.sold&&c.saleType==="traded"){right=money(+c.soldPrice||0);sub2=+c.tradeCash?money(+c.tradeCash)+" cash":"trade value"}
   else if(c.sold){right=money(+c.soldPrice||0);sub2=(+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null)?round2(+c.soldPrice/+c.mv*100)+"% of market":"sale price"}
-  else if(c.repack==="accepted"){right=money(payoutOf(c));sub2="Triumph pays"}
+  else if(c.repack==="accepted"){right=money(payoutOf(c));sub2=(c.repacker||"Repacker")+" pays"}
   else{right=money(+c.mv||0);sub2=(+c.pct||0)+"% = "+money(payoutOf(c))}
   const act=edit==="sel"?"toggle-sel":edit?"edit-card":view?"view-card":"";
   const picked=edit==="sel"&&ui.sel&&ui.sel.has(c.id);
   const pre=edit==="sel"?'<span class="selc'+(picked?" on":"")+'">'+(picked?ic("check",15):"")+"</span>":"";
   const first=n?attachList(c.id)[0]:null;
   const th='<div class="thumbsm '+(first?"":oc)+'">'+(first?'<img data-path="'+esc(first.path)+'" alt="">':ic("cards",20))+"</div>";
-  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+REPACK[c.repack]+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"");
+  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"");
   return '<div class="row'+(act?"":" static")+(picked?" picked":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
 function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
@@ -697,7 +708,7 @@ function cardsView(){
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
   return '<div class="hero"><span>Market value</span><b class="big">'+money(t.mv)+'</b><small>Payout due '+money(t.due)+(t.accN?" | "+money(t.accDue)+" already accepted":"")+'</small><div class="hstats"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>"+
-  (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Triumph status</button>':"")+"</span></div>":
+  (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
   '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Sell many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
@@ -715,7 +726,7 @@ function ledgerList(list,kind){
 }
 const ACT_VERB={insert:"added",update:"edited",delete:"deleted"};
 const ACT_ENT={cards:"card",spend:"spend",payouts:"payout",weeks:"week",settings:"settings",attachments:"photo"};
-const COL_NAMES={description:"description",market_value:"market value",consignor_pct:"consignor %",sold_price:"sale price",sold_date:"sold date",date_purchased:"date",entry_date:"date",card_id:"card",split_done:"split done",reset_day:"reset day",default_pct:"default %",closed_by:"closed by",end_date:"end date",week_id:"week",sale_type:"how it left",trade_cash:"trade cash",from_card_id:"trade-in for",repack_status:"Triumph status",repack_date:"Triumph date"};
+const COL_NAMES={description:"description",market_value:"market value",consignor_pct:"consignor %",sold_price:"sale price",sold_date:"sold date",date_purchased:"date",entry_date:"date",card_id:"card",split_done:"split done",reset_day:"reset day",default_pct:"default %",closed_by:"closed by",end_date:"end date",week_id:"week",sale_type:"how it left",trade_cash:"trade cash",from_card_id:"trade-in for",repack_status:"repacker status",repack_date:"repacker date",repacker:"repacker"};
 const prettyDetail=s=>String(s||"").replace(/(^|; )([a-z_]+):/g,(m,a,k)=>a+(COL_NAMES[k]||k)+":");
 function dayLabel(ts){
   const k=isoOf(new Date(ts)),t=new Date();if(k===isoOf(t))return "Today";
@@ -744,7 +755,7 @@ function moneyView(){
   '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+ledgerList(w.payouts,"payouts");
 }
 function tilesFor(t){
-  return '<div class="hero"><span>Profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Payout due '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+"</span></div>"+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock")+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by Triumph",t.accN,"Triumph owes "+money(t.accDue))+tile("Pending at Triumph",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
+  return '<div class="hero"><span>Profit</span><b class="big'+(t.profit<0?" neg":"")+'">'+money(t.profit)+'</b><div class="brk"><span>Payout due '+money(t.due)+'</span><span>+ Cash in '+money(t.proceeds)+'</span><span>- Spent '+money(t.spent)+"</span></div>"+(!(t.spent>0)&&(t.due>0||t.proceeds>0)?'<div class="hwarn">No buys or spend recorded for this week yet, so profit equals the payout. Add what each partner spent on the Money tab.</div>':"")+'</div><div class="tiles">'+tile("Market value",money(t.mv),t.stockN+" in stock")+tile("Payout due",money(t.due))+tile("Spent",money(t.spent),"Paid out "+money(t.paid))+tile("Accepted by repackers",t.accN,Object.keys(t.accBy).length?Object.entries(t.accBy).map(([n,v])=>esc(n)+" owes "+money(v)).join(" | "):"Nothing accepted yet")+tile("Pending at repackers",t.pendN,money(t.pendDue)+" if accepted")+tile("Sold or traded",t.soldN,"Traded "+t.tradedN+" | Cash in "+money(t.proceeds))+tile("Rate",t.rate==null?"n/a":t.rate.toFixed(2)+"%","spent / market value")+tile("Average sold %",t.soldPct==null?"n/a":t.soldPct.toFixed(1)+"%","sale / market, cash sales")+"</div>";
 }
 function partnerTable(w){
   return "<table><tr><th>Partner</th><th>Spent</th><th>Paid</th><th>Left</th></tr>"+state.settings.partners.map(p=>{const c=pcalc(w,p);return "<tr><td>"+esc(p)+"</td><td>"+money(c.spent)+"</td><td>"+money(c.paid)+'</td><td class="'+(c.left<0?"neg":"")+'">'+money(c.left)+"</td></tr>"}).join("")+"</table>";
@@ -854,7 +865,7 @@ function zxHints(){
   H.set(ZXing.DecodeHintType.TRY_HARDER,true);
   return H;
 }
-const camHTML=id=>'<div class="camwrap" id="'+id+'w" hidden><video id="'+id+'" playsinline muted autoplay></video><div class="guide"></div><div class="camtip">Fit the QR code (back of the slab) or the barcode inside the box. Or tap the button to snap a photo.</div><button type="button" class="shutter" id="'+id+'snap" aria-label="Snap a photo and read it"></button></div>';
+const camHTML=id=>'<div class="camwrap" id="'+id+'w" hidden><video id="'+id+'" playsinline muted autoplay></video><div class="camtap" id="'+id+'tap"></div><div class="guide"></div><div class="camtip">Fit the QR code (back of the slab) or the barcode in the box, then tap to scan.</div><button type="button" class="shutter" id="'+id+'snap" aria-label="Scan"></button></div>';
 async function startCamera(video,onCode,quiet){
   stopCamera();
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){if(!quiet)toast("Camera needs the app opened over https");return false}
@@ -866,6 +877,7 @@ async function startCamera(video,onCode,quiet){
   try{const tr=stream.getVideoTracks()[0],cap=tr.getCapabilities&&tr.getCapabilities();if(cap&&cap.focusMode&&cap.focusMode.includes("continuous"))await tr.applyConstraints({advanced:[{focusMode:"continuous"}]})}catch(e){}
   let last="",lastT=0,on=true,n=0;
   const emit=t=>{const c=normalizeCert(t);if(!/^\d{5,10}$/.test(c))return;const now=Date.now();if(c===last&&now-lastT<2500)return;last=c;lastT=now;onCode(c)};
+  if(!onCode){camStop=()=>{stream.getTracks().forEach(t=>t.stop());video.srcObject=null};return true}
   let det=null,reader=null;
   if("BarcodeDetector" in window){try{const f=await BarcodeDetector.getSupportedFormats();if(f.includes("qr_code")||f.includes("code_128"))det=new BarcodeDetector({formats:["qr_code","code_128","code_39","data_matrix","itf"].filter(x=>f.includes(x))})}catch(e){}}
   if(!det){try{await loadZX();reader=new ZXing.MultiFormatReader();reader.setHints(zxHints())}catch(e){}}
@@ -897,6 +909,7 @@ function captureFrame(video){
     cv.toBlob(b=>res(b),"image/jpeg",0.92);
   });
 }
+function shutterFx(host){const d=document.createElement("div");d.className="shutterfx";host.appendChild(d);setTimeout(()=>d.remove(),350)}
 async function snapAndRead(video,wrap){
   wrap.classList.add("busy");const b=await captureFrame(video);const c=b?await readBarcodeFromImage(b):null;wrap.classList.remove("busy");return c;
 }
@@ -933,7 +946,7 @@ function newCardRow(o){return Object.assign({week_id:state.week.id},cardRow(Obje
 function scanModal(){
   const session=[],pending=new Set();
   const owners=["Shared",...state.settings.partners];
-  const el=modal('<video id="scv" class="fs-video" playsinline muted autoplay></video><div class="fs-guide" id="scguide"></div>'+
+  const el=modal('<video id="scv" class="fs-video" playsinline muted autoplay></video><div class="fs-tap" id="sctap" role="button" aria-label="Tap to scan"></div><div class="fs-guide" id="scguide"><span>Tap anywhere to scan</span></div>'+
     '<div class="fs-msg" id="scmsg" hidden><p>Camera is off. Allow camera access, or use Photo of label or Type a cert.</p><button class="btn sm" id="scretry" type="button">Try camera again</button></div>'+
     '<div class="fs-flash" id="scflash"></div>'+
     '<div class="fs-top"><button class="fs-ib" data-act="close-modal" type="button" aria-label="Close">'+ic("plus",22).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+'</button><h2>Scan certs</h2><button class="fs-chip" id="scopt" type="button"></button></div>'+
@@ -952,7 +965,7 @@ function scanModal(){
     const n=session.length,named=session.filter(x=>x.title).length;
     $("#sccount",el).textContent=String(n);
     $("#scsub",el).textContent=(n===1?"card":"cards")+" added";
-    $("#sclist",el).innerHTML=n?session.map(x=>'<div class="fs-row'+(x.fresh?" new":"")+'"><div class="main"><div class="desc">'+esc(x.title||"Cert "+x.cert)+'</div><div class="sub">'+(x.title?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+'</div></div><span class="badge '+(x.st==="err"?"ok":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+'</span><button class="fs-del" type="button" data-del="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",17)+"</button></div>").join(""):'<p class="hint" style="margin:8px 2px 2px">Point the camera at a slab. Each one is saved right away.</p>';
+    $("#sclist",el).innerHTML=n?session.map(x=>'<div class="fs-row'+(x.fresh?" new":"")+'"><div class="main"><div class="desc">'+esc(x.title||"Cert "+x.cert)+'</div><div class="sub">'+(x.title?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+'</div></div><span class="badge '+(x.st==="err"?"ok":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+'</span><button class="fs-del" type="button" data-del="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",17)+"</button></div>").join(""):'<p class="hint" style="margin:8px 2px 2px">Point at the QR code or barcode, then tap the screen. Each slab is saved right away.</p>';
     session.forEach(x=>{x.fresh=false});
   };
   let chain=Promise.resolve();
@@ -1007,9 +1020,17 @@ function scanModal(){
   const scph=$("#scph",el);
   $("#scphb",el).addEventListener("click",()=>{scph.value="";scph.click()});
   scph.addEventListener("change",async()=>{const file=scph.files[0];if(!file)return;flash("Reading photo...");const c=await readBarcodeFromImage(file);if(c)add(c);else{beep(false);flash("No code found in that photo","warn")}});
-  $("#scvsnap",el).addEventListener("click",async()=>{if(!vid.srcObject){flash("Camera is off. Use Photo of label.","warn");return}flash("Reading...");const c=await snapAndRead(vid,el);if(c)add(c);else{beep(false);flash("No code found. Move closer and hold still.","warn")}});
+  let snapping=false;
+  const snap=async()=>{
+    if(snapping)return;if(!vid.srcObject){flash("Camera is off. Use Photo of label.","warn");return}
+    snapping=true;shutterFx(el);flash("Reading...");
+    const c=await snapAndRead(vid,el);snapping=false;
+    if(c)add(c);else{beep(false);flash("No code found. Move closer and tap again.","warn")}
+  };
+  $("#sctap",el).addEventListener("click",snap);
+  $("#scvsnap",el).addEventListener("click",snap);
   // camera starts right away
-  const cam=async()=>{$("#scmsg",el).hidden=true;const ok=await startCamera(vid,add,true);if(!ok&&el.isConnected)$("#scmsg",el).hidden=false};
+  const cam=async()=>{$("#scmsg",el).hidden=true;const ok=await startCamera(vid,null,true);if(!ok&&el.isConnected)$("#scmsg",el).hidden=false};
   $("#scretry",el).addEventListener("click",cam);
   optLabel();paint();cam();
 }
@@ -1120,10 +1141,10 @@ async function hydrateThumbs(box){
 async function compressImage(file,quiet){
   try{
     const bmp=window.createImageBitmap?await createImageBitmap(file):await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)});
-    const w0=bmp.width||bmp.naturalWidth,h0=bmp.height||bmp.naturalHeight,k=Math.min(1,1600/Math.max(w0,h0));
+    const w0=bmp.width||bmp.naturalWidth,h0=bmp.height||bmp.naturalHeight,k=Math.min(1,1280/Math.max(w0,h0));
     const cv=document.createElement("canvas");cv.width=Math.max(1,Math.round(w0*k));cv.height=Math.max(1,Math.round(h0*k));
     cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
-    const blob=await new Promise(res=>cv.toBlob(res,"image/jpeg",0.82));
+    const blob=await new Promise(res=>cv.toBlob(res,"image/jpeg",0.78));
     if(!blob)throw new Error("blob");
     return blob;
   }catch(e){if(!quiet)toast("Could not read that photo. Try a different one.");return null}
@@ -1191,14 +1212,15 @@ function cardModal(id,carry){
   const recvHTML=dsp==="traded"&&c?'<p class="hint">'+(recv.length?"Received in this trade: "+recv.map(x=>esc(x.desc||("cert "+x.cert))).join(", "):"No received cards added yet.")+'</p><button type="button" class="btn sec sm" id="addrecv">Add received card</button>':'<p class="hint" id="recvhint">'+(c?"":"Save this card first, then add the cards you received.")+'</p><button type="button" class="btn sec sm" id="addrecv" style="display:'+(c?"inline-block":"none")+'">Add received card</button>';
   const sel=v=>dsp===v?" selected":"";
   const fc=c&&attachList(c.id)[0];
-  const el=modal('<div class="ehead"><div class="thumbsm '+(fc?"":ownerCls(d.owner))+'" style="width:48px;height:48px">'+(fc?'<img data-path="'+esc(fc.path)+'" alt="">':ic("cards",22))+'</div><div style="min-width:0"><h2>'+(c?"Edit card":"Add card")+'</h2><div class="hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c?esc(c.desc||"Cert "+(c.cert||"n/a")):"Scan or type the cert to start")+"</div>"+(c?'<div class="pills" style="margin-top:4px"><span class="badge '+ownerCls(c.owner)+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):c.repack?'<span class="badge rp-'+c.repack+'">'+REPACK[c.repack]+"</span>":'<span class="badge ok">In stock</span>')+"</div>":"")+"</div></div>"+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
+  const el=modal('<div class="ehead"><div class="thumbsm '+(fc?"":ownerCls(d.owner))+'" style="width:48px;height:48px">'+(fc?'<img data-path="'+esc(fc.path)+'" alt="">':ic("cards",22))+'</div><div style="min-width:0"><h2>'+(c?"Edit card":"Add card")+'</h2><div class="hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c?esc(c.desc||"Cert "+(c.cert||"n/a")):"Scan or type the cert to start")+"</div>"+(c?'<div class="pills" style="margin-top:4px"><span class="badge '+ownerCls(c.owner)+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":'<span class="badge ok">In stock</span>')+"</div>":"")+"</div></div>"+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
     '<div class="sech"><h3>Card</h3></div><div class="formbox">'+
     field("PSA cert #",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" placeholder="Type, scan, or tap Scan" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button><button type="button" class="btn sec" id="psab">PSA</button></div>'+camHTML("cv")+'<div id="camopts" class="hint" hidden><button class="linkbtn" id="certphb" type="button">Use the phone camera instead</button></div><input type="file" id="certph" accept="image/*" capture="environment" hidden><div class="psast" id="psast"></div>')+
     field("Description",'<input name="desc" placeholder="2023 Charizard ex PSA 10" value="'+esc(d.desc)+'">')+
     '<div class="two"><div>'+field("Date purchased",'<input type="date" name="date" value="'+esc(d.date)+'">')+"</div><div>"+field("Owner",'<select name="owner">'+owners.map(o=>"<option"+(o===d.owner?" selected":"")+">"+esc(o)+"</option>").join("")+"</select>")+"</div></div></div>"+
     '<div class="sech"><h3>Value</h3></div><div class="formbox"><div class="two"><div>'+field("Market value ($)",'<input name="mv" type="number" step="0.01" inputmode="decimal" value="'+esc(d.mv)+'">')+"</div><div>"+field("Consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+esc(d.pct)+'">')+'</div></div><div class="preview" id="pv"></div></div>'+
-    '<div class="sech"><h3>Status</h3></div><div class="formbox">'+(state.hasRepack?field("Triumph",'<div class="seg" data-for="repack">'+[["","Not sent","Not sent to Triumph yet."],["pending","Pending","Sent to Triumph, waiting for approval."],["accepted","Accepted","Technically sold. Triumph owes the payout."],["rejected","Rejected","Triumph did not take it."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="repack" class="hidesel"><option value="">Not sent to Triumph</option>'+["pending","accepted","rejected"].map(k=>'<option value="'+k+'"'+(d.repack===k?" selected":"")+">"+REPACK[k]+"</option>").join("")+"</select>"):"")+
-    field("Customer sale",'<div class="seg" data-for="disp">'+[["stock","Not sold","Still ours (or with Triumph)."],["sold","Sold","Sold to a customer for cash."],["traded","Traded","Traded to a customer."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="disp" class="hidesel"><option value="stock"'+sel("stock")+'>Not sold to a customer</option><option value="sold"'+sel("sold")+'>Sold to a customer for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
+    '<div class="sech"><h3>Status</h3></div><div class="formbox">'+(state.hasRepack?field("Repacker status",'<div class="seg" data-for="repack">'+[["","Not sent","Not sent to a repacker yet."],["pending","Pending","Sent, waiting for approval."],["accepted","Accepted","Technically sold. The repacker owes the payout."],["rejected","Rejected","The repacker did not take it."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="repack" class="hidesel"><option value="">Not sent</option>'+["pending","accepted","rejected"].map(k=>'<option value="'+k+'"'+(d.repack===k?" selected":"")+">"+k+"</option>").join("")+"</select>")+
+    (state.hasRepacker?(()=>{const reps=[...state.settings.repackers];if(d.repacker&&!reps.includes(d.repacker))reps.push(d.repacker);const cur=d.repacker||reps[0];return '<div id="rpwho"'+(d.repack?"":' style="display:none"')+">"+field("Which repacker",'<div class="seg" data-for="repacker">'+reps.map(n=>'<button type="button" data-v="'+esc(n)+'" data-h="">'+esc(n)+"</button>").join("")+'</div><select name="repacker" class="hidesel">'+reps.map(n=>"<option"+(n===cur?" selected":"")+">"+esc(n)+"</option>").join("")+"</select>")+"</div>"})():""):"")+
+    field("Customer sale",'<div class="seg" data-for="disp">'+[["stock","Not sold","Still ours (or with a repacker)."],["sold","Sold","Sold to a customer for cash."],["traded","Traded","Traded to a customer."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="disp" class="hidesel"><option value="stock"'+sel("stock")+'>Not sold to a customer</option><option value="sold"'+sel("sold")+'>Sold to a customer for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
     '<div id="outbox" style="display:'+(dsp==="stock"?"none":"block")+'">'+
       '<div id="soldf" style="display:'+(dsp==="sold"?"block":"none")+'"><div class="two"><div>'+field("Sale price ($)",'<input name="soldPrice" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="sold"?d.soldPrice:"")+'">')+"</div><div>"+field("% of market value",'<input name="soldPctMk" type="number" step="0.1" inputmode="decimal" value="'+esc(pctMk)+'">')+'</div></div><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-pp="'+q+'">'+q+'%</button>').join("")+"</div></div>"+
       '<div id="tradef" style="display:'+(dsp==="traded"?"block":"none")+'"><div class="two"><div>'+field("Trade value of this card ($)",'<input name="tradeValue" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="traded"?d.soldPrice:"")+'">')+"</div><div>"+field("Cash we received ($)",'<input name="tradeCash" type="number" step="0.01" inputmode="decimal" value="'+esc(d.tradeCash)+'">')+"</div></div>"+recvHTML+"</div>"+
@@ -1217,6 +1239,7 @@ function cardModal(id,carry){
     sg.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;sl.value=b.dataset.v;sl.dispatchEvent(new Event("change",{bubbles:true}));paintSeg()});
     sl.addEventListener("change",paintSeg);paintSeg();
   });
+  if(f.repack)f.repack.addEventListener("change",()=>{const wv=$("#rpwho",el);if(wv)wv.style.display=f.repack.value?"":"none"});
   f.cert.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&f.cert.value.trim()){e.preventDefault();f.cert.value=normalizeCert(f.cert.value);f.desc.focus()}});
   f.cert.addEventListener("change",()=>{f.cert.value=normalizeCert(f.cert.value)});
   $("#psab",el).addEventListener("click",async()=>{
@@ -1236,10 +1259,12 @@ function cardModal(id,carry){
     const w=$("#cvw",el);
     if(!w.hidden){camOff();return}
     w.hidden=false;$("#camopts",el).hidden=false;$("#certcam",el).textContent="Close";
-    const ok=await startCamera($("#cv",el),t=>gotCert(normalizeCert(t)));
+    const ok=await startCamera($("#cv",el),null);
     if(!ok)camOff();
   });
-  $("#cvsnap",el).addEventListener("click",async()=>{const st=$("#psast",el);st.className="psast";st.textContent="Reading...";const c=await snapAndRead($("#cv",el),$("#cvw",el));if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c}else{beep(false);st.className="psast err";st.textContent="No code found in that shot. Move a little closer, hold still, and try again."}});
+  let cvBusy=false;
+  const cvSnap=async()=>{if(cvBusy)return;cvBusy=true;shutterFx($("#cvw",el));const st=$("#psast",el);st.className="psast";st.textContent="Reading...";const c=await snapAndRead($("#cv",el),$("#cvw",el));cvBusy=false;if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c}else{beep(false);st.className="psast err";st.textContent="No code found. Move a little closer and tap again."}};
+  $("#cvsnap",el).addEventListener("click",cvSnap);$("#cvtap",el).addEventListener("click",cvSnap);
   const certph=$("#certph",el);
   $("#certphb",el).addEventListener("click",()=>{camOff();certph.value="";certph.click()});
   certph.addEventListener("change",async()=>{const file=certph.files[0];if(!file)return;const st=$("#psast",el);st.className="psast";st.textContent="Reading barcode...";const c=await readBarcodeFromImage(file);if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c}else{beep(false);st.className="psast err";st.textContent="No barcode found in that photo. Get closer to the label, or type the number."}});
@@ -1273,7 +1298,7 @@ function cardModal(id,carry){
   const commit=async()=>{
     const v=f.disp.value,isOut=v!=="stock";
     const price=v==="sold"?f.soldPrice.value:v==="traded"?f.tradeValue.value:"";
-    const rec={date:f.date.value||todayISO(),cert:f.cert.value.trim(),desc:f.desc.value.trim(),owner:f.owner.value,mv:f.mv.value===""?"":+f.mv.value,pct:f.pct.value===""?state.settings.defaultPct:+f.pct.value,sold:isOut,saleType:isOut?v:"",soldPrice:price===""?"":+price,soldDate:isOut?f.soldDate.value:"",tradeCash:v==="traded"&&f.tradeCash.value!==""?+f.tradeCash.value:"",notes:f.notes.value.trim(),repack:f.repack?f.repack.value:(d.repack||""),repackDate:f.repack&&f.repack.value&&f.repack.value===d.repack?d.repackDate:""};
+    const rec={date:f.date.value||todayISO(),cert:f.cert.value.trim(),desc:f.desc.value.trim(),owner:f.owner.value,mv:f.mv.value===""?"":+f.mv.value,pct:f.pct.value===""?state.settings.defaultPct:+f.pct.value,sold:isOut,saleType:isOut?v:"",soldPrice:price===""?"":+price,soldDate:isOut?f.soldDate.value:"",tradeCash:v==="traded"&&f.tradeCash.value!==""?+f.tradeCash.value:"",notes:f.notes.value.trim(),repack:f.repack?f.repack.value:(d.repack||""),repacker:f.repacker?f.repacker.value:(d.repacker||""),repackDate:f.repack&&f.repack.value&&f.repack.value===d.repack?d.repackDate:""};
     let cardId=id;
     if(id){if(!await api(sb.from("cards").update(cardRow(rec)).eq("id",id)))return null}
     else{const r=await api(sb.from("cards").insert(Object.assign({week_id:w.id},cardRow(rec),d.fromCardId?{from_card_id:d.fromCardId}:{})).select("id").single());if(!r)return null;cardId=r.data.id}
@@ -1300,7 +1325,7 @@ function viewCardModal(id){
   const kv=(a,b)=>'<div class="kv"><span>'+esc(a)+"</span><span>"+b+"</span></div>";
   const from=c.fromCardId&&wk.cards.find(y=>y.id===c.fromCardId);
   const recv=wk.cards.filter(y=>y.fromCardId===c.id);
-  const el=modal("<h2>"+esc(c.desc||"(no description)")+"</h2>"+kv("Cert",esc(c.cert||"n/a"))+kv("Date purchased",fmtDate(c.date))+kv("Owner",esc(c.owner))+(c.repack?kv("Triumph",esc(REPACK[c.repack])+(c.repackDate?" ("+fmtDate(c.repackDate)+")":"")):"")+kv("Market value",money(+c.mv||0))+kv("Consignor rate",(+c.pct||0)+"% = "+money(payoutOf(c)))+
+  const el=modal("<h2>"+esc(c.desc||"(no description)")+"</h2>"+kv("Cert",esc(c.cert||"n/a"))+kv("Date purchased",fmtDate(c.date))+kv("Owner",esc(c.owner))+(c.repack?kv("Repacker",esc(rpLabel(c))+(c.repackDate?" ("+fmtDate(c.repackDate)+")":"")):"")+kv("Market value",money(+c.mv||0))+kv("Consignor rate",(+c.pct||0)+"% = "+money(payoutOf(c)))+
     (c.sold?kv(c.saleType==="traded"?"Traded":"Sold",fmtDate(c.soldDate))+kv(c.saleType==="traded"?"Trade value":"Sale price",money(+c.soldPrice||0)+((+c.mv>0&&c.soldPrice!=="")?" ("+round2(+c.soldPrice/+c.mv*100)+"% of market)":""))+kv("Cash received",money(cashIn(c))):"")+
     (from?kv("Received in trade for",esc(cardLabel(from))):"")+(recv.length?kv("Received in this trade",recv.map(y=>esc(y.desc||y.cert)).join(", ")):"")+(c.notes?kv("Notes",esc(c.notes)):"")+
     '<label>Photos</label><div class="thumbs" id="thumbs"></div><p class="hint">'+whoText(c)+'</p><div class="actions"><button class="btn sec" data-act="close-modal">Close</button></div>');
@@ -1418,13 +1443,19 @@ function closeWeekModal(){
   const el=modal('<h2>Close this week</h2><p class="hint">Saves '+w.cards.length+" cards, "+w.spend.length+" spend and "+w.payouts.length+" payout entries to History for everyone (spent "+money(t.spent)+"), then resets.</p><form id=\"wf\">"+field("Name",'<input name="label" value="'+esc(label)+'">')+'<label class="chk"><input type="checkbox" name="carry">Carry over unsold cards to the new week</label><div class="actions"><button class="btn" type="submit">Continue</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
   $("#wf",el).addEventListener("submit",e=>{
     e.preventDefault();const f=e.target,name=f.label.value.trim()||label,carry=f.carry.checked,keep=w.cards.filter(c=>!c.sold).length;
-    el.innerHTML='<div class="grab"></div><div class="dzic" style="background:var(--warn);color:var(--warn-ink)">'+ic("history",26)+'</div><h2 class="center">Close the week for everyone?</h2><p class="hint center"><b>'+esc(name)+'</b> moves to History and a fresh week starts on every phone.</p><div class="counts"><div><b>'+w.cards.length+'</b><span>cards</span></div><div><b>'+(w.spend.length+w.payouts.length)+'</b><span>money entries</span></div><div><b>'+money(t.profit)+'</b><span>profit</span></div></div><p class="hint center">'+(carry?keep+" unsold "+(keep===1?"card carries":"cards carry")+" over to the new week.":"Nothing carries over. The new week starts empty.")+'</p><div class="actions"><button class="btn" id="cwyes" type="button">Yes, close week</button><button class="btn sec" id="cwback" type="button">Go back</button></div>';
+    el.innerHTML='<div class="grab"></div><div class="dzic" style="background:var(--warn);color:var(--warn-ink)">'+ic("history",26)+'</div><h2 class="center">Close the week for everyone?</h2><p class="hint center"><b>'+esc(name)+'</b> moves to History and a fresh week starts on every phone.</p><div class="counts"><div><b>'+w.cards.length+'</b><span>cards</span></div><div><b>'+(w.spend.length+w.payouts.length)+'</b><span>money entries</span></div><div><b>'+money(t.profit)+'</b><span>profit</span></div></div><p class="hint center">'+(carry?keep+" unsold "+(keep===1?"card carries":"cards carry")+" over to the new week.":"Nothing carries over. The new week starts empty.")+'</p><label class="chk"><input type="checkbox" id="cwclear" checked>Also clear the activity log</label><p class="hint" style="margin:2px 0 0 30px">Keeps storage small. <button class="linkbtn" id="cwaud" type="button" style="padding:0">Download it as a CSV first</button></p><div class="actions"><button class="btn" id="cwyes" type="button">Yes, close week</button><button class="btn sec" id="cwback" type="button">Go back</button></div>';
     $("#cwback",el).addEventListener("click",()=>closeWeekModal());
+    $("#cwaud",el).addEventListener("click",()=>exportAudit());
     $("#cwyes",el).addEventListener("click",async e2=>{
       el.querySelectorAll("button").forEach(b=>b.disabled=true);
-      const r=await api(sb.rpc("close_week",{p_label:name,p_carry:carry}));
-      if(!r){el.querySelectorAll("button").forEach(b=>b.disabled=false);return}
-      closeModal();ui.tab="history";ui.top=true;await refreshRender();toast("Week saved to History");
+      const clear=$("#cwclear",el).checked;let note="";
+      let r;try{r=await sb.rpc("close_week",{p_label:name,p_carry:carry,p_clear_activity:clear})}catch(x){r={error:x}}
+      if(r&&r.error&&(r.error.code==="PGRST202"||/close_week/.test(String(r.error.message||"")))){
+        try{r=await sb.rpc("close_week",{p_label:name,p_carry:carry})}catch(x){r={error:x}}
+        if(!(r&&r.error)&&clear)note=" Run upgrade-5.sql so the activity log clears on reset.";
+      }
+      if(r&&r.error){toast(errText(r.error));el.querySelectorAll("button").forEach(b=>b.disabled=false);return}
+      closeModal();ui.tab="history";ui.top=true;await refreshRender();toast("Week saved to History"+(clear&&!note?". Activity log cleared.":".")+note);
     });
   });
 }
@@ -1435,9 +1466,9 @@ function settingsModal(){
   const kv=(k,v,cls)=>'<div class="kv"><span>'+esc(k)+'</span><span class="'+(cls||"")+'">'+v+"</span></div>";
   const el=modal('<div class="prof"><button class="profav" id="avch" type="button" aria-label="'+(hasAv?"Change":"Add")+' profile photo">'+avatarHTML(me.name,84)+'<span class="cam">'+ic("camera",16)+'</span></button><div class="profname">'+esc(me.name)+'</div><div class="profmail">'+esc(me.email)+'</div><div class="proflinks"><button class="linkbtn" id="avch2" type="button">'+(hasAv?"Change photo":"Add photo")+"</button>"+(hasAv?'<button class="linkbtn dz" id="avrm" type="button">Remove</button>':"")+'</div><input type="file" id="avin" accept="image/*" hidden></div>'+
     '<div class="sech"><h3>Account</h3></div><div class="menu" style="margin-top:0"><button class="mi" data-act="change-pw" type="button">'+ic("lock")+'<span class="mt">Change password</span><span class="chev">'+ic("open",18)+'</span></button><button class="mi dz" data-act="sign-out" type="button">'+ic("logout")+'<span class="mt">Sign out</span></button></div>'+
-    '<div class="sech"><h3>Business settings</h3></div><form id="sf" class="formbox"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>'<option value="'+i+'"'+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div><button class="btn block" type="submit">Save settings</button></form>'+
+    '<div class="sech"><h3>Business settings</h3></div><form id="sf" class="formbox"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>'<option value="'+i+'"'+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div>'+(state.hasRepackerList?field("Repackers (comma separated)",'<input name="rps" value="'+esc(s.repackers.join(", "))+'">'):"")+'<button class="btn block" type="submit">Save settings</button></form>'+
     '<div class="sech"><h3>Data</h3></div><div class="menu" style="margin-top:0"><button class="mi" data-act="backup" type="button">'+ic("download")+'<span class="mt">Export backup<small>Everything in one file</small></span><span class="chev">'+ic("open",18)+"</span></button></div>"+
-    '<div class="sech"><h3>About</h3></div><div class="kvlist">'+kv("App version",String(APP_VERSION))+kv("Live sync",esc(live),liveOk?"ok":"bad")+kv("Online now",esc([me.name+" (you)",...others].join(", ")))+'</div><p class="tiny">Screen '+Math.round(screen.height)+" | view "+innerHeight+" | app "+Math.round(document.documentElement.getBoundingClientRect().height)+(navigator.standalone?" | home screen":"")+'</p>'+
+    '<div class="sech"><h3>About</h3></div><div class="kvlist">'+kv("App version",String(APP_VERSION))+(()=>{let n=0;(state.attach||new Map()).forEach(l=>{n+=l.length});const av=(state.members||[]).filter(m=>m.avatar_path).length,mb=Math.round((n*0.22+av*0.04)*10)/10;return kv("Photo storage",n+" photo"+(n===1?"":"s")+" | about "+(mb<1?"under 1":mb)+" MB of 1 GB",mb>800?"bad":"")})()+kv("Live sync",esc(live),liveOk?"ok":"bad")+kv("Online now",esc([me.name+" (you)",...others].join(", ")))+'</div><p class="tiny">Screen '+Math.round(screen.height)+" | view "+innerHeight+" | app "+Math.round(document.documentElement.getBoundingClientRect().height)+(navigator.standalone?" | home screen":"")+'</p>'+
     '<div class="actions"><button class="btn sec block" data-act="close-modal" type="button">Done</button></div>');
   hydrateThumbs(el);
   const avin=$("#avin",el);
@@ -1451,6 +1482,7 @@ function settingsModal(){
     busy(f,true);
     const r=await api(sb.rpc("save_settings",{p_partners:[n0,n1],p_reset_day:+f.day.value,p_default_pct:+f.pct.value||90}));
     if(!r){busy(f,false);return}
+    if(f.rps){const list=[...new Set(f.rps.value.split(",").map(x=>x.trim()).filter(Boolean))];if(list.length&&list.join("|")!==s.repackers.join("|"))await api(sb.from("settings").update({repackers:list}).eq("id",1))}
     closeModal();await refreshRender();toast("Settings saved");
   });
 }
@@ -1466,10 +1498,18 @@ function passwordModal(){
 
 // ---------- csv import ----------
 function importChooser(){
-  const el=modal('<h2>Import CSV</h2><div class="menu"><button class="mi" data-m="new" type="button">'+ic("plus")+'<span class="mt">New cards we got<small>Adds cards from a Triumph export or any list of certs</small></span><span class="chev">'+ic("open",18)+'</span></button><button class="mi" data-m="triumph" type="button">'+ic("check")+'<span class="mt">What Triumph accepted<small>Marks matching cards as accepted, pending or rejected. Adds nothing unless you choose to.</small></span><span class="chev">'+ic("open",18)+'</span></button></div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
-  el.addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(!b)return;
-    if(b.dataset.m==="triumph"&&!state.hasRepack){toast("Run upgrade-4.sql in Supabase first, then try again");return}
-    ui.importMode=b.dataset.m;closeModal();$("#csvin").value="";$("#csvin").click()});
+  const reps=state.settings.repackers;
+  const el=modal('<h2>Import CSV</h2><div id="ic1"><div class="menu"><button class="mi" data-m="new" type="button">'+ic("plus")+'<span class="mt">New cards we got<small>Adds cards from a repacker export or any list of certs</small></span><span class="chev">'+ic("open",18)+'</span></button><button class="mi" data-m="triumph" type="button">'+ic("check")+'<span class="mt">What a repacker accepted<small>Marks matching cards as accepted, pending or rejected. Adds nothing unless you choose to.</small></span><span class="chev">'+ic("open",18)+'</span></button></div></div><div id="ic2" hidden><p class="hint" id="ic2t"></p><div class="menu">'+reps.map(n=>'<button class="mi" data-rp="'+esc(n)+'" type="button">'+ic("layers")+'<span class="mt">'+esc(n)+'</span><span class="chev">'+ic("open",18)+"</span></button>").join("")+'<button class="mi" data-rp="" id="icnone" type="button">'+ic("upload")+'<span class="mt">Not from a repacker<small>Just a list of cards we got</small></span><span class="chev">'+ic("open",18)+'</span></button></div></div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  let mode="";
+  el.addEventListener("click",e=>{
+    const m=e.target.closest("[data-m]");
+    if(m){mode=m.dataset.m;
+      if(mode==="triumph"&&!state.hasRepack){toast("Run upgrade-4.sql in Supabase first, then try again");return}
+      $("#ic1",el).hidden=true;$("#ic2",el).hidden=false;$("#icnone",el).hidden=mode==="triumph";
+      $("#ic2t",el).textContent=mode==="triumph"?"Which repacker is this file from?":"Is this file from a repacker? Its accepted and pending statuses come along.";return}
+    const r=e.target.closest("[data-rp]");
+    if(r){ui.importMode=mode;ui.importRepacker=r.dataset.rp;closeModal();$("#csvin").value="";$("#csvin").click()}
+  });
 }
 function rowRepack(st,approved,hasCols){
   st=String(st||"").toLowerCase();approved=String(approved||"").trim().toLowerCase();
@@ -1495,14 +1535,16 @@ async function importTriumphStatus(text){
     const c=byCert.get(cert);
     if(!c){if(state.week.cards.some(x=>x.cert===cert&&x.sold))soldAlready++;else missing.push({cert,st,mv,pct,desc:iT>=0?g(r,iT).trim():""});return}
     const patch={};
-    if(c.repack!==st){patch.repack_status=st;patch.repack_date=todayISO()}
+    const who=ui.importRepacker||state.settings.repackers[0];
+    if(c.repack!==st||(state.hasRepacker&&c.repacker!==who)){patch.repack_status=st;patch.repack_date=todayISO();if(state.hasRepacker)patch.repacker=who}
     if(mv!=null&&round2(+c.mv||0)!==round2(mv))patch.market_value=mv;
     if(pct!=null&&(+c.pct||0)!==pct)patch.consignor_pct=pct;
     if(c.notes===PENDING_NOTE)patch.notes="";
     if(Object.keys(patch).length)changes.push({c,patch,st});else same++;
   });
   const cnt=k=>changes.filter(x=>x.patch.repack_status===k).length;
-  const el=modal('<h2>What Triumph accepted</h2><div class="counts"><div><b>'+cnt("accepted")+'</b><span>newly accepted</span></div><div><b>'+cnt("pending")+'</b><span>pending</span></div><div><b>'+cnt("rejected")+'</b><span>rejected</span></div></div><p class="hint">'+(changes.length?changes.length+" card"+(changes.length>1?"s":"")+" in this week will be updated"+(changes.some(x=>x.patch.market_value!=null||x.patch.consignor_pct!=null)?" (some also get Triumph's market value or rate)":"")+".":"No changes needed.")+(same?" "+same+" already up to date.":"")+(soldAlready?" "+soldAlready+" already sold to customers, left alone.":"")+"</p>"+
+  const rpn=ui.importRepacker||state.settings.repackers[0];
+  const el=modal('<h2>What '+esc(rpn)+' accepted</h2><div class="counts"><div><b>'+cnt("accepted")+'</b><span>newly accepted</span></div><div><b>'+cnt("pending")+'</b><span>pending</span></div><div><b>'+cnt("rejected")+'</b><span>rejected</span></div></div><p class="hint">'+(changes.length?changes.length+" card"+(changes.length>1?"s":"")+" in this week will be updated"+(changes.some(x=>x.patch.market_value!=null||x.patch.consignor_pct!=null)?" (some also get the repacker's market value or rate)":"")+".":"No changes needed.")+(same?" "+same+" already up to date.":"")+(soldAlready?" "+soldAlready+" already sold to customers, left alone.":"")+"</p>"+
     (missing.length?'<label class="chk"><input type="checkbox" id="tiadd">Also add the '+missing.length+" cert"+(missing.length>1?"s":"")+" not in this week</label>":"")+
     '<div class="actions"><button class="btn" id="tigo" type="button"'+(changes.length||missing.length?"":" disabled")+'>Update</button><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
   $("#tigo",el).addEventListener("click",async()=>{
@@ -1511,7 +1553,7 @@ async function importTriumphStatus(text){
     for(let k=0;k<changes.length;k+=8){const rs=await Promise.all(changes.slice(k,k+8).map(x=>api(sb.from("cards").update(x.patch).eq("id",x.c.id))));ok+=rs.filter(Boolean).length}
     let added=0;
     if(missing.length&&$("#tiadd",el)&&$("#tiadd",el).checked){
-      const rowsNew=missing.map(m=>newCardRow({cert:m.cert,desc:m.desc,mv:m.mv==null?"":m.mv,pct:m.pct==null?state.settings.defaultPct:m.pct,repack:m.st,repackDate:todayISO()}));
+      const rowsNew=missing.map(m=>newCardRow({cert:m.cert,desc:m.desc,mv:m.mv==null?"":m.mv,pct:m.pct==null?state.settings.defaultPct:m.pct,repack:m.st,repackDate:todayISO(),repacker:rpn}));
       for(let k=0;k<rowsNew.length;k+=300){if(await api(sb.from("cards").upsert(rowsNew.slice(k,k+300),{onConflict:"week_id,cert",ignoreDuplicates:true})))added+=Math.min(300,rowsNew.length-k)}
     }
     closeModal();await refreshRender();toast(ok+" updated"+(added?", "+added+" added":""));
@@ -1519,12 +1561,15 @@ async function importTriumphStatus(text){
 }
 function repackBulkModal(){
   const ids=[...(ui.sel||[])];if(!ids.length){toast("Select at least one card");return}
-  const el=modal("<h2>Triumph status for "+plural(ids.length,"card")+'</h2><div class="menu">'+[["accepted","Accepted by Triumph","Technically sold. Triumph owes the payout."],["pending","Pending at Triumph","Sent, waiting for approval"],["rejected","Rejected by Triumph","Triumph did not take it"],["","Not sent to Triumph","Clear the status"]].map(o=>'<button class="mi" data-r="'+o[0]+'" type="button"><span class="badge '+(o[0]?"rp-"+o[0]:"ok")+'" style="flex:0 0 auto">'+(o[0]?"":"None")+'</span><span class="mt">'+o[1]+"<small>"+o[2]+"</small></span></button>").join("")+'</div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
-  el.querySelectorAll("[data-r]").forEach(b=>{b.querySelector(".badge").textContent=b.dataset.r?({accepted:"Accepted",pending:"Pending",rejected:"Rejected"})[b.dataset.r]:"None"});
-  el.addEventListener("click",async e=>{const b=e.target.closest("[data-r]");if(!b)return;const v=b.dataset.r;
+  const reps=state.settings.repackers;let who=reps[0];
+  const el=modal("<h2>Repacker for "+plural(ids.length,"card")+"</h2>"+(state.hasRepacker?field("Which repacker",'<div class="seg" id="bwho">'+reps.map((n,i)=>'<button type="button" data-w="'+esc(n)+'" class="'+(i?"":"on")+'">'+esc(n)+"</button>").join("")+"</div>"):"")+'<div class="menu">'+[["accepted","Accepted","Technically sold. The repacker owes the payout."],["pending","Pending","Sent, waiting for approval"],["rejected","Rejected","The repacker did not take it"],["","Not sent","Clear the status"]].map(o=>'<button class="mi" data-r="'+o[0]+'" type="button"><span class="badge '+(o[0]?"rp-"+o[0]:"ok")+'" style="flex:0 0 auto">'+(o[0]?o[1]:"None")+'</span><span class="mt">'+o[1]+"<small>"+o[2]+"</small></span></button>").join("")+'</div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  el.addEventListener("click",async e=>{
+    const wb=e.target.closest("[data-w]");if(wb){who=wb.dataset.w;el.querySelectorAll("[data-w]").forEach(x=>x.classList.toggle("on",x===wb));return}
+    const b=e.target.closest("[data-r]");if(!b)return;const v=b.dataset.r;
     el.querySelectorAll("button").forEach(x=>x.disabled=true);
-    for(let k=0;k<ids.length;k+=8)await Promise.all(ids.slice(k,k+8).map(id=>api(sb.from("cards").update({repack_status:v||null,repack_date:v?todayISO():null}).eq("id",id))));
-    ui.sel=null;closeModal();await refreshRender();toast(plural(ids.length,"card")+" set to "+(v?REPACK[v]:"Not sent to Triumph"));
+    const patch={repack_status:v||null,repack_date:v?todayISO():null};if(state.hasRepacker)patch.repacker=v?who:null;
+    for(let k=0;k<ids.length;k+=8)await Promise.all(ids.slice(k,k+8).map(id=>api(sb.from("cards").update(patch).eq("id",id))));
+    ui.sel=null;closeModal();await refreshRender();toast(plural(ids.length,"card")+" set to "+(v?RPV[v]+" "+who:"Not sent"));
   });
 }
 const PENDING_NOTE="Pending Triumph approval";
@@ -1537,7 +1582,8 @@ async function importCSVText(text){
   const byCert=new Map(state.week.cards.filter(c=>c.cert).map(c=>[c.cert,c]));
 
   if(H.includes("cert id")&&H.includes("card title")){
-    // Triumph export
+    // repacker export (Triumph format)
+    const rpFrom=ui.importMode==="new"&&ui.importRepacker!==undefined?ui.importRepacker:"Triumph";
     const X=n=>H.indexOf(n);
     const iT=X("card title"),iC=X("cert id"),iG=X("grade"),iCo=X("grading company"),iM=X("market value"),iR=X("rate"),iO=X("owner"),iS=X("status"),iCS=X("card status"),iA=X("approved");
     const seen=new Set(),items=[];let rejected=0;
@@ -1551,18 +1597,18 @@ async function importCSVText(text){
       const tag=co&&gr?co+" "+gr:"";
       const desc=title+(tag&&!title.toUpperCase().includes(tag.toUpperCase())?" "+tag:"");
       const pending=/pending/.test(st)||/^no$/i.test(g(r,iA).trim());
-      items.push({cert,desc,mv:parseMoney(g(r,iM)),pct:g(r,iR)!==""?parseMoney(g(r,iR)):state.settings.defaultPct,owner:pickOwner(g(r,iO)),pending,repack:pending?"pending":/accept|approv/.test(st)?"accepted":""});
+      items.push({cert,desc,mv:parseMoney(g(r,iM)),pct:g(r,iR)!==""?parseMoney(g(r,iR)):state.settings.defaultPct,owner:pickOwner(g(r,iO)),pending,repack:!rpFrom?"":pending?"pending":/accept|approv/.test(st)?"accepted":""});
     });
     const fresh=items.filter(i=>!i.cert||!byCert.has(i.cert));
-    const upd=items.filter(i=>{const c=i.cert&&byCert.get(i.cert);return c&&(round2(+c.mv||0)!==round2(i.mv)||(+c.pct||0)!==i.pct||(c.notes===PENDING_NOTE&&!i.pending)||(state.hasRepack&&!c.sold&&i.repack&&c.repack!==i.repack))});
+    const upd=items.filter(i=>{const c=i.cert&&byCert.get(i.cert);return c&&(round2(+c.mv||0)!==round2(i.mv)||(+c.pct||0)!==i.pct||(c.notes===PENDING_NOTE&&!i.pending)||(state.hasRepack&&!c.sold&&i.repack&&(c.repack!==i.repack||c.repacker!==rpFrom)))});
     const pendNew=fresh.filter(i=>i.pending).length;
     let incl=true;
-    if(pendNew&&!confirm(pendNew+" new cards are still pending approval at Triumph. Include them? OK = include (marked Pending at Triumph), Cancel = skip them."))incl=false;
+    if(pendNew&&!confirm(pendNew+" new cards are still pending approval"+(rpFrom?" at "+rpFrom:"")+". Include them? OK = include"+(rpFrom?" (marked Pending at "+rpFrom+")":"")+", Cancel = skip them."))incl=false;
     const add=fresh.filter(i=>incl||!i.pending);
     if(!add.length&&!upd.length){toast("Nothing new. Everything in this file is already here.");return}
-    if(!confirm("Triumph import: "+add.length+" new cards"+(upd.length?", "+upd.length+" existing cards get updated market value or rate":"")+(rejected?" ("+rejected+" rejected rows ignored)":"")+". Continue?"))return;
+    if(!confirm("Import: "+add.length+" new cards"+(upd.length?", "+upd.length+" existing cards get updated market value or rate":"")+(rejected?" ("+rejected+" rejected rows ignored)":"")+". Continue?"))return;
     toast("Importing...");
-    const rowsNew=add.map(i=>newCardRow({cert:i.cert,desc:i.desc,mv:i.mv,pct:i.pct,owner:i.owner,repack:state.hasRepack?i.repack:"",notes:i.pending&&!state.hasRepack?PENDING_NOTE:""}));
+    const rowsNew=add.map(i=>newCardRow({cert:i.cert,desc:i.desc,mv:i.mv,pct:i.pct,owner:i.owner,repack:state.hasRepack?i.repack:"",repacker:i.repack?rpFrom:"",notes:i.pending&&!state.hasRepack?PENDING_NOTE:""}));
     for(let k=0;k<rowsNew.length;k+=300){
       if(!await api(sb.from("cards").upsert(rowsNew.slice(k,k+300),{onConflict:"week_id,cert",ignoreDuplicates:true})))return;
     }
@@ -1570,7 +1616,7 @@ async function importCSVText(text){
       const c=byCert.get(i.cert);
       const patch={market_value:i.mv,consignor_pct:i.pct};
       if(c.notes===PENDING_NOTE&&(!i.pending||state.hasRepack))patch.notes="";
-      if(state.hasRepack&&!c.sold&&i.repack&&c.repack!==i.repack){patch.repack_status=i.repack;patch.repack_date=todayISO()}
+      if(state.hasRepack&&!c.sold&&i.repack&&(c.repack!==i.repack||c.repacker!==rpFrom)){patch.repack_status=i.repack;patch.repack_date=todayISO();if(state.hasRepacker)patch.repacker=rpFrom}
       if(!await api(sb.from("cards").update(patch).eq("id",c.id)))break;
     }
     await refreshRender();toast(add.length+" added"+(upd.length?", "+upd.length+" updated":""));
