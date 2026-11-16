@@ -222,7 +222,24 @@ body.shell .toast{position:absolute}
 .hero .brk span{display:inline;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;opacity:.85}
 .psast{font-size:13px;margin:6px 0 0;color:var(--mute)}
 .psast.ok{color:var(--pos)}.psast.err{color:var(--neg)}
-.bigav{display:flex;align-items:center;gap:14px;margin:6px 0 4px}
+.prof{display:flex;flex-direction:column;align-items:center;text-align:center;padding:4px 0 2px}
+.profav{position:relative;border:0;background:none;padding:0;cursor:pointer;border-radius:99px}
+.profav .cam{position:absolute;right:-2px;bottom:-2px;width:30px;height:30px;border-radius:99px;background:var(--acc);color:var(--acc-ink);display:grid;place-items:center;box-shadow:0 0 0 3px var(--card)}
+.profname{font-weight:700;font-size:20px;margin-top:12px;letter-spacing:-.01em}
+.profmail{color:var(--mute);font-size:14px;margin-top:2px}
+.proflinks{display:flex;gap:16px;margin-top:10px}
+.linkbtn{background:none;border:0;padding:4px 2px;color:var(--acc);font-weight:600;font-size:14.5px;cursor:pointer}
+.linkbtn.dz{color:var(--neg)}
+.mi .chev{margin-left:auto;color:var(--mute)}
+.mi .mt{display:flex;flex-direction:column;min-width:0}
+.mi .mt small{color:var(--mute);font-size:12.5px;font-weight:400;margin-top:1px}
+.formbox{background:var(--bg);border-radius:14px;padding:2px 14px 14px;margin-top:4px}
+.formbox input,.formbox select{background:var(--card)}
+.formbox .btn{margin-top:14px}
+.kvlist{background:var(--bg);border-radius:14px;padding:0 14px;margin-top:4px}
+.kvlist .kv:last-child{border-bottom:0}
+.kv .ok{color:var(--pos)}.kv .bad{color:var(--neg)}
+.tiny{font-size:11.5px;color:var(--mute);margin:8px 2px 0}
 
 .selbar>div:first-child{min-width:0;white-space:nowrap;overflow:hidden}
 .selbar .btn{white-space:nowrap;padding:6px 10px;font-size:13.5px}
@@ -324,17 +341,40 @@ async function api(p){
 }
 
 // ---------- realtime ----------
+const APP_VERSION=13;
+let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
-  if(rt||!sb)return;
-  rt=sb.channel("repack-live",{config:{presence:{key:me.name}}})
-    .on("postgres_changes",{event:"*",schema:"public"},()=>{clearTimeout(rtT);rtT=setTimeout(softRefresh,400)})
-    .on("presence",{event:"sync"},()=>{try{online=rt.presenceState()||{}}catch(e){online={}}paintPresence()})
-    .subscribe(st=>{if(st==="SUBSCRIBED")trackMe(true)});
+  if(!sb||!me)return;
+  if(!rt){
+    rt=sb.channel("repack-live")
+      .on("postgres_changes",{event:"*",schema:"public"},()=>{clearTimeout(rtT);rtT=setTimeout(softRefresh,400)})
+      .subscribe((st,err)=>{rtStatus=st;rtErr=err?String(err.message||err):"";if(st==="CHANNEL_ERROR"||st==="TIMED_OUT")retryLive()});
+  }
+  if(!pc){
+    pc=sb.channel("repack-presence",{config:{presence:{key:me.name}}})
+      .on("presence",{event:"sync"},()=>{try{online=pc.presenceState()||{}}catch(e){online={}}paintPresence()})
+      .subscribe((st,err)=>{pcStatus=st;pcErr=err?String(err.message||err):"";if(st==="SUBSCRIBED")trackMe(true);else if(st==="CHANNEL_ERROR"||st==="TIMED_OUT")retryLive()});
+  }
+}
+function retryLive(){
+  clearTimeout(retryT);
+  retryT=setTimeout(()=>{if(!me||!sb)return;
+    if(rt&&rtStatus!=="SUBSCRIBED"){try{sb.removeChannel(rt)}catch(e){}rt=null}
+    if(pc&&pcStatus!=="SUBSCRIBED"){try{sb.removeChannel(pc)}catch(e){}pc=null;online={};lastTrack=""}
+    subscribe();
+  },5000);
+}
+function liveText(){
+  if(rtStatus==="SUBSCRIBED"&&pcStatus==="SUBSCRIBED")return "Connected";
+  const bad=[rtStatus&&rtStatus!=="SUBSCRIBED"?"data "+rtStatus.toLowerCase().replace("_"," ")+(rtErr?" ("+rtErr+")":""):"",pcStatus&&pcStatus!=="SUBSCRIBED"?"online list "+pcStatus.toLowerCase().replace("_"," ")+(pcErr?" ("+pcErr+")":""):""].filter(Boolean);
+  return bad.length?"Not connected: "+bad.join(", "):"Connecting...";
 }
 function teardown(){
   clearTimeout(rtT);
+  clearTimeout(retryT);
   if(rt&&sb){try{sb.removeChannel(rt)}catch(e){}}
-  rt=null;me=null;state=null;online={};lastTrack="";
+  if(pc&&sb){try{sb.removeChannel(pc)}catch(e){}}
+  rt=null;pc=null;me=null;state=null;online={};lastTrack="";rtStatus=pcStatus=rtErr=pcErr="";
   try{localStorage.removeItem(CACHE_KEY)}catch(e){}
 }
 
@@ -487,7 +527,10 @@ const ICON={
   edit:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   open:'<path d="M9 18l6-6-6-6"/>',
   check:'<path d="M5 12.5 10 17l9-10"/>',
-  lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
+  lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  logout:'<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/>'
 };
 const ic=(n,s)=>'<svg class="ic" viewBox="0 0 24 24" width="'+(s||20)+'" height="'+(s||20)+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[n]+"</svg>";
 const ownerCls=o=>{const P=state.settings.partners;return o===P[0]?"o0":o===P[1]?"o1":"os"};
@@ -509,10 +552,10 @@ function presenceHTML(){
 }
 function paintPresence(){const b=$("#presence");if(b){b.innerHTML=presenceHTML();hydrateThumbs(b)}}
 function trackMe(force){
-  if(!rt||!me||document.hidden)return;
+  if(!pc||!me||document.hidden)return;
   const tab=ui.hist?"History":(TABN[ui.tab]||"");
   if(!force&&tab===lastTrack)return;lastTrack=tab;
-  clearTimeout(trackT);trackT=setTimeout(()=>{try{rt.track({name:me.name,tab,at:Date.now()})}catch(e){}},250);
+  clearTimeout(trackT);trackT=setTimeout(()=>{try{pc&&pc.track({name:me.name,tab,at:Date.now()})}catch(e){}},250);
 }
 function whoModal(){
   const l=othersOnline();
@@ -804,12 +847,12 @@ async function squareAvatar(file){
 }
 async function setAvatar(file){
   let path=null;
-  if(file){
+  if(file){toast("Uploading photo...");
     const b=await squareAvatar(file);if(!b){toast("Could not read that photo. Try a different one.");return}
     path="avatars/"+uid()+".jpg";
     if(!await api(sb.storage.from("receipts").upload(path,b,{contentType:"image/jpeg"})))return;
   }
-  const r=await sb.rpc("set_my_avatar",{p_path:path}).catch(e=>({error:e}));
+  let r;try{r=await sb.rpc("set_my_avatar",{p_path:path})}catch(e){r={error:e}}
   if(r.error){if(path)removeFiles([path]);const m=String(r.error.message||"");toast(r.error.code==="PGRST202"||/set_my_avatar/.test(m)?"Run upgrade-3.sql in Supabase first, then try again":errText(r.error));return}
   if(r.data)removeFiles([r.data]);
   closeModal();await refreshRender();toast(file?"Profile photo updated":"Profile photo removed");
@@ -1185,11 +1228,18 @@ function closeWeekModal(){
 function settingsModal(){
   const s=state.settings;
   const myM=memberOf(me.name),hasAv=!!(myM&&myM.avatar_path);
-  const el=modal('<h2>Account</h2><div class="bigav">'+avatarHTML(me.name,64)+'<div><div style="font-weight:700;font-size:17px">'+esc(me.name)+'</div><div class="hint" style="margin:2px 0 8px">'+esc(me.email)+'</div><div style="display:flex;gap:6px"><button class="btn sec sm" id="avch" type="button">'+(hasAv?"Change photo":"Add photo")+"</button>"+(hasAv?'<button class="btn sec sm" id="avrm" type="button">Remove</button>':"")+'</div></div><input type="file" id="avin" accept="image/*" hidden></div><div class="toolbar"><button class="btn sec" data-act="change-pw">Change password</button><button class="btn sec" data-act="sign-out">Sign out</button></div><h2 style="margin-top:22px">Settings</h2><form id="sf"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>"<option value=\""+i+"\""+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div><div class="actions"><button class="btn" type="submit">Save settings</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>'+
-  '<h2 style="margin-top:22px">Backup</h2><p class="hint">App version 12 | screen '+Math.round(screen.height)+" | view "+innerHeight+" | app "+Math.round(document.documentElement.getBoundingClientRect().height)+(navigator.standalone?" | home screen":"")+'</p><p class="hint">Data lives in your shared database. This downloads a copy of everything as a file.</p><div class="toolbar"><button class="btn sec" data-act="backup">Export backup</button></div>');
+  const others=othersOnline().map(p=>p.name),live=liveText(),liveOk=live==="Connected";
+  const kv=(k,v,cls)=>'<div class="kv"><span>'+esc(k)+'</span><span class="'+(cls||"")+'">'+v+"</span></div>";
+  const el=modal('<div class="prof"><button class="profav" id="avch" type="button" aria-label="'+(hasAv?"Change":"Add")+' profile photo">'+avatarHTML(me.name,84)+'<span class="cam">'+ic("camera",16)+'</span></button><div class="profname">'+esc(me.name)+'</div><div class="profmail">'+esc(me.email)+'</div><div class="proflinks"><button class="linkbtn" id="avch2" type="button">'+(hasAv?"Change photo":"Add photo")+"</button>"+(hasAv?'<button class="linkbtn dz" id="avrm" type="button">Remove</button>':"")+'</div><input type="file" id="avin" accept="image/*" hidden></div>'+
+    '<div class="sech"><h3>Account</h3></div><div class="menu" style="margin-top:0"><button class="mi" data-act="change-pw" type="button">'+ic("lock")+'<span class="mt">Change password</span><span class="chev">'+ic("open",18)+'</span></button><button class="mi dz" data-act="sign-out" type="button">'+ic("logout")+'<span class="mt">Sign out</span></button></div>'+
+    '<div class="sech"><h3>Business settings</h3></div><form id="sf" class="formbox"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>'<option value="'+i+'"'+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div><button class="btn block" type="submit">Save settings</button></form>'+
+    '<div class="sech"><h3>Data</h3></div><div class="menu" style="margin-top:0"><button class="mi" data-act="backup" type="button">'+ic("download")+'<span class="mt">Export backup<small>Everything in one file</small></span><span class="chev">'+ic("open",18)+"</span></button></div>"+
+    '<div class="sech"><h3>About</h3></div><div class="kvlist">'+kv("App version",String(APP_VERSION))+kv("Live sync",esc(live),liveOk?"ok":"bad")+kv("Online now",esc([me.name+" (you)",...others].join(", ")))+'</div><p class="tiny">Screen '+Math.round(screen.height)+" | view "+innerHeight+" | app "+Math.round(document.documentElement.getBoundingClientRect().height)+(navigator.standalone?" | home screen":"")+'</p>'+
+    '<div class="actions"><button class="btn sec block" data-act="close-modal" type="button">Done</button></div>');
   hydrateThumbs(el);
   const avin=$("#avin",el);
-  $("#avch",el).addEventListener("click",()=>{avin.value="";avin.click()});
+  const pick=()=>{avin.value="";avin.click()};
+  $("#avch",el).addEventListener("click",pick);$("#avch2",el).addEventListener("click",pick);
   avin.addEventListener("change",()=>{if(avin.files[0])setAvatar(avin.files[0])});
   if($("#avrm",el))$("#avrm",el).addEventListener("click",()=>setAvatar(null));
   $("#sf",el).addEventListener("submit",async e=>{
@@ -1372,7 +1422,7 @@ document.addEventListener("click",e=>{if(lpSuppress&&e.target.closest("[data-act
 document.addEventListener("input",e=>{if(e.target.id==="q"){ui.q=e.target.value;paintList()}});
 document.addEventListener("change",e=>{const id=e.target.id;if(id==="sortsel"){ui.sort=e.target.value;try{localStorage.setItem("repack-ui",JSON.stringify({sort:ui.sort}))}catch(x){}render()}else if(id==="ownersel"){ui.owner=e.target.value;render()}});
 $("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importCSVText(String(r.result));r.readAsText(f)});
-document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document.hidden){try{rt&&rt.untrack()}catch(e){}lastTrack=""}else{softRefresh();trackMe(true)}});
+document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document.hidden){try{pc&&pc.untrack()}catch(e){}lastTrack=""}else{softRefresh();if(pcStatus!=="SUBSCRIBED"||rtStatus!=="SUBSCRIBED")retryLive();trackMe(true)}});
 window.addEventListener("online",()=>{if(sb&&me)softRefresh()});
 
 // ---------- full-screen height (iPhone home screen apps report a short height) ----------
