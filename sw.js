@@ -1,4 +1,4 @@
-const CACHE = "repack-ledger-v10";
+const CACHE = "repack-ledger-v11";
 const ASSETS = ["./", "./index.html", "./zxing.min.js", "./supabase.js", "./config.js", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -15,7 +15,8 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET" || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).then(res => {
+    fetch(e.request.url, { cache: "no-cache", credentials: "same-origin" }).then(res => {
+      if (!res.ok) throw new Error("bad status");
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return res;
