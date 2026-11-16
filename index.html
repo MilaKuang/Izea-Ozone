@@ -415,7 +415,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=19;
+const APP_VERSION=20;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -865,7 +865,7 @@ function zxHints(){
   H.set(ZXing.DecodeHintType.TRY_HARDER,true);
   return H;
 }
-const camHTML=id=>'<div class="camwrap" id="'+id+'w" hidden><video id="'+id+'" playsinline muted autoplay></video><div class="camtap" id="'+id+'tap"></div><div class="guide"></div><div class="camtip">Fit the QR code (back of the slab) or the barcode in the box, then tap to scan.</div><button type="button" class="shutter" id="'+id+'snap" aria-label="Scan"></button></div>';
+const camHTML=id=>'<div class="camwrap" id="'+id+'w" hidden><video id="'+id+'" playsinline muted autoplay></video><div class="camtap" id="'+id+'tap"></div><div class="guide"></div><div class="camtip">Fit the front label in the box, then tap to read the cert and card name.</div><button type="button" class="shutter" id="'+id+'snap" aria-label="Scan"></button></div>';
 async function startCamera(video,onCode,quiet){
   stopCamera();
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){if(!quiet)toast("Camera needs the app opened over https");return false}
@@ -946,26 +946,28 @@ function newCardRow(o){return Object.assign({week_id:state.week.id},cardRow(Obje
 function scanModal(){
   const session=[],pending=new Set();
   const owners=["Shared",...state.settings.partners];
-  const el=modal('<video id="scv" class="fs-video" playsinline muted autoplay></video><div class="fs-tap" id="sctap" role="button" aria-label="Tap to scan"></div><div class="fs-guide" id="scguide"><span>Tap anywhere to scan</span></div>'+
+  const el=modal('<video id="scv" class="fs-video" playsinline muted autoplay></video><div class="fs-tap" id="sctap" role="button" aria-label="Tap to scan"></div><div class="fs-guide" id="scguide"><span>Fit the front label in the box, then tap</span></div>'+
     '<div class="fs-msg" id="scmsg" hidden><p>Camera is off. Allow camera access, or use Photo of label or Type a cert.</p><button class="btn sm" id="scretry" type="button">Try camera again</button></div>'+
     '<div class="fs-flash" id="scflash"></div>'+
     '<div class="fs-top"><button class="fs-ib" data-act="close-modal" type="button" aria-label="Close">'+ic("plus",22).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+'</button><h2>Scan certs</h2><button class="fs-chip" id="scopt" type="button"></button></div>'+
-    '<div class="fs-extra" id="scopts" hidden><div class="two"><div>'+field("Owner",'<select id="scown">'+owners.map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label><button class="btn block sm" id="scoptok" type="button" style="margin-top:10px">Done</button></div>'+
+    '<div class="fs-extra" id="scopts" hidden><div class="two"><div>'+field("Owner",'<select id="scown">'+owners.map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scocr"'+(ocrOn()?" checked":"")+'>Read the card name from the front label</label><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label><button class="btn block sm" id="scoptok" type="button" style="margin-top:10px">Done</button></div>'+
     '<div class="fs-extra" id="sctype" hidden><div class="certrow"><input id="scin" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="Type a cert number"><button class="btn" id="scadd" type="button">Add</button></div><p class="tiny">A Bluetooth or USB barcode scanner works without opening this.</p></div>'+
     '<input type="file" id="scph" accept="image/*" capture="environment" hidden>'+
     '<div class="fs-panel"><div class="fs-head"><div class="fs-count"><b id="sccount">0</b><span id="scsub">scanned</span></div><button class="fs-snap" id="scvsnap" type="button" aria-label="Snap a photo and read it">'+ic("camera",24)+'</button><div style="text-align:right"><button class="btn" data-act="close-modal" type="button">Done</button></div></div>'+
     '<div class="fs-tools"><button class="chip" id="scphb" type="button">Photo of label</button><button class="chip" id="sctypeb" type="button">Type a cert</button></div><div class="fs-list" id="sclist"></div></div>');
   el.classList.add("fullscan");el.parentNode.classList.add("fullscan");
-  const vid=$("#scv",el),inp=$("#scin",el),own=$("#scown",el),pct=$("#scpct",el),psaBox=$("#scpsa",el);
+  const vid=$("#scv",el),inp=$("#scin",el),own=$("#scown",el),pct=$("#scpct",el),psaBox=$("#scpsa",el),ocrBox=$("#scocr",el);
+  ocrBox.addEventListener("change",e=>{try{localStorage.setItem("repack-ocr",e.target.checked?"1":"0")}catch(x){}optLabel();if(e.target.checked)ocrReady().catch(()=>{})});
+  if(ocrBox.checked)ocrReady().catch(()=>{});
   let flashT;
   const flash=(msg,kind)=>{const f=$("#scflash",el);f.textContent=msg;f.className="fs-flash show "+(kind||"");clearTimeout(flashT);flashT=setTimeout(()=>{f.className="fs-flash"},1700)};
   const hit=()=>{const g=$("#scguide",el);g.classList.add("hit");setTimeout(()=>g.classList.remove("hit"),700)};
-  const optLabel=()=>{$("#scopt",el).textContent=own.value+" | "+(+pct.value||state.settings.defaultPct)+"%"+(psaBox.checked?" | PSA":"")};
+  const optLabel=()=>{$("#scopt",el).textContent=own.value+" | "+(+pct.value||state.settings.defaultPct)+"%"+(ocrBox.checked?" | Names":"")+(psaBox.checked?" | PSA":"")};
   const paint=()=>{
     const n=session.length,named=session.filter(x=>x.title).length;
     $("#sccount",el).textContent=String(n);
     $("#scsub",el).textContent=(n===1?"card":"cards")+" added";
-    $("#sclist",el).innerHTML=n?session.map(x=>'<div class="fs-row'+(x.fresh?" new":"")+'"><div class="main"><div class="desc">'+esc(x.title||"Cert "+x.cert)+'</div><div class="sub">'+(x.title?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+'</div></div><span class="badge '+(x.st==="err"?"ok":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":"Saved")+'</span><button class="fs-del" type="button" data-del="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",17)+"</button></div>").join(""):'<p class="hint" style="margin:8px 2px 2px">Point at the QR code or barcode, then tap the screen. Each slab is saved right away.</p>';
+    $("#sclist",el).innerHTML=n?session.map(x=>'<div class="fs-row'+(x.fresh?" new":"")+'"><div class="main"><div class="desc">'+esc(x.title||"Cert "+x.cert)+'</div><div class="sub">'+(x.title?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+'</div></div><span class="badge '+(x.st==="err"?"ok":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":x.title?"Name read":"Saved")+'</span><button class="fs-del" type="button" data-del="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",17)+"</button></div>").join(""):'<p class="hint" style="margin:8px 2px 2px">Fit the front label in the box and tap the screen. The cert and card name are read and saved right away.</p>';
     session.forEach(x=>{x.fresh=false});
   };
   let chain=Promise.resolve();
@@ -977,15 +979,17 @@ function scanModal(){
     else{await psaAttach(item.id,r,true);item.title=r.title;item.st="ok"}
     ui.dirty=true;if(el.isConnected)paint();
   })};
-  const add=async raw=>{
+  const add=async(raw,desc)=>{
     const cert=normalizeCert(raw);if(!cert||pending.has(cert))return;
-    if(session.some(x=>x.cert===cert)){flash("Already scanned "+cert);return}
-    if(state.week.cards.some(c=>c.cert===cert)){beep(false);flash("Already in this week: "+cert,"warn");return}
+    const inSess=session.find(x=>x.cert===cert);
+    if(inSess){if(desc&&!inSess.title&&inSess.id){if(await api(sb.from("cards").update({description:desc}).eq("id",inSess.id))){inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}}flash("Already scanned "+cert);return}
+    const ex=state.week.cards.find(c=>c.cert===cert);
+    if(ex){if(desc&&!ex.desc){if(await api(sb.from("cards").update({description:desc}).eq("id",ex.id))){ex.desc=desc;ui.dirty=true;beep(true);hit();flash("Name added to "+cert,"ok");return}}beep(false);flash("Already in this week: "+cert,"warn");return}
     pending.add(cert);
-    const r=await api(sb.from("cards").insert(newCardRow({cert,owner:own.value,pct:+pct.value||state.settings.defaultPct})).select("id").single());
+    const r=await api(sb.from("cards").insert(newCardRow({cert,desc:desc||"",owner:own.value,pct:+pct.value||state.settings.defaultPct})).select("id").single());
     pending.delete(cert);
     if(!r){beep(false);return}
-    const item={cert,id:r.data&&r.data.id,owner:own.value,title:"",st:"saved",fresh:true};
+    const item={cert,id:r.data&&r.data.id,owner:own.value,title:desc||"",st:"saved",fresh:true};
     session.unshift(item);ui.dirty=true;beep(true);hit();flash("Added "+cert,"ok");paint();
     if(psaBox.checked&&item.id)enrich(item);
   };
@@ -1019,13 +1023,20 @@ function scanModal(){
   // photo of label and snap
   const scph=$("#scph",el);
   $("#scphb",el).addEventListener("click",()=>{scph.value="";scph.click()});
-  scph.addEventListener("change",async()=>{const file=scph.files[0];if(!file)return;flash("Reading photo...");const c=await readBarcodeFromImage(file);if(c)add(c);else{beep(false);flash("No code found in that photo","warn")}});
+  const readName=async cvP=>{if(!ocrBox.checked)return null;try{const cv=await cvP;return cv?await ocrCanvas(cv):null}catch(e){flash("Card name reader could not load","warn");return null}};
+  scph.addEventListener("change",async()=>{const file=scph.files[0];if(!file)return;flash(ocrBox.checked?"Reading label...":"Reading photo...");el.classList.add("busy");
+    let c=await readBarcodeFromImage(file);const o=await readName(imageCanvas(file,2200));el.classList.remove("busy");
+    if(!c&&o&&o.cert)c=o.cert;if(c)add(c,o&&o.desc);else{beep(false);flash("No cert found in that photo","warn")}});
   let snapping=false;
   const snap=async()=>{
     if(snapping)return;if(!vid.srcObject){flash("Camera is off. Use Photo of label.","warn");return}
-    snapping=true;shutterFx(el);flash("Reading...");
-    const c=await snapAndRead(vid,el);snapping=false;
-    if(c)add(c);else{beep(false);flash("No code found. Move closer and tap again.","warn")}
+    snapping=true;shutterFx(el);flash(ocrBox.checked?"Reading label...":"Reading...");
+    const cvO=ocrBox.checked?guideCanvas(vid,$("#scguide",el)):null;
+    let c=await snapAndRead(vid,el);
+    let o=null;if(cvO){el.classList.add("busy");o=await readName(Promise.resolve(cvO));el.classList.remove("busy")}
+    snapping=false;
+    if(!c&&o&&o.cert)c=o.cert;
+    if(c)add(c,o&&o.desc);else{beep(false);flash("No cert found. Fit the label in the box and tap again.","warn")}
   };
   $("#sctap",el).addEventListener("click",snap);
   $("#scvsnap",el).addEventListener("click",snap);
@@ -1058,11 +1069,73 @@ async function setAvatar(file){
   closeModal();await refreshRender();toast(file?"Profile photo updated":"Profile photo removed");
 }
 
+// ---------- read the front label text (on-device OCR) ----------
+let ocrW=null,ocrP=null;
+function ocrReady(){
+  if(ocrW)return Promise.resolve(ocrW);
+  if(!ocrP)ocrP=(async()=>{
+    if(!window.Tesseract)await new Promise((res,rej)=>{const s=document.createElement("script");s.src="ocr/tesseract.min.js";s.onload=res;s.onerror=()=>rej(new Error("ocr"));document.head.appendChild(s)});
+    ocrW=await Tesseract.createWorker("eng",1,{workerPath:"ocr/worker.min.js",corePath:"ocr",langPath:"ocr",gzip:true,cacheMethod:"write",logger:()=>{}});
+    return ocrW;
+  })().catch(e=>{ocrP=null;throw e});
+  return ocrP;
+}
+const GRADE_WORDS=["GEM MT","GEM MINT","NM-MT","NM MT","EX-MT","VG-EX","MINT","AUTHENTIC","NM","EX","VG","GOOD","FAIR","POOR"];
+function parseLabel(raw){
+  const lines=String(raw||"").split(/\n+/).map(l=>l.replace(/[^A-Za-z0-9#&'.\-\/ ]+/g," ").replace(/\s+/g," ").trim()).filter(l=>l.length>=2||/^\d$/.test(l));
+  const all=lines.join(" "),U=all.toUpperCase();
+  const certs=(all.match(/\b\d{7,10}\b/g)||[]).filter(x=>!/^(19|20)\d\d$/.test(x)).sort((a,b)=>b.length-a.length);
+  const cert=certs[0]||"";
+  let gw="",gn="";
+  for(const w of GRADE_WORDS){const re=new RegExp("(^|\\s)"+w.replace(/[-\s]/g,"[-\\s]?")+"(?=\\s|$)(\\s+(10|[1-9](\\.5)?))?");const m=U.match(re);if(m&&!(w==="EX"&&/\bEX\b/.test(all)&&!/\bEX\s+(10|[1-9])\b/.test(U))){gw=w;gn=m[3]||"";break}}
+  if(!gn){const solo=lines.filter(l=>/^(10|[1-9](\.5)?)$/.test(l));if(solo.length)gn=solo[solo.length-1];else if(gw){const m=lines.map(l=>l.match(/(?:^|\s)(10|[1-9](?:\.5)?)$/)).filter(Boolean);if(m.length)gn=m[m.length-1][1]}}
+  const nm=all.match(/#\s?([A-Za-z0-9][A-Za-z0-9\-\/]{0,7})/);const num=nm?nm[1]:"";
+  const desc=[];
+  lines.forEach(l=>{
+    let t=" "+l+" ";
+    if(cert)t=t.replace(new RegExp("\\s"+cert+"(?=\\s)","g")," ");
+    if(nm)t=t.replace(/#\s?[A-Za-z0-9][A-Za-z0-9\-\/]{0,7}/g," ");
+    if(gw)t=t.replace(new RegExp("\\s"+gw.replace(/[-\s]/g,"[-\\s]?")+"(?=\\s)","ig")," ");
+    if(gn)t=t.replace(new RegExp("\\s"+gn.replace(".","\\.")+"\\s*$")," ");
+    if(/^\s*\d{1,2}(\.5)?\s*$/.test(t))t="";
+    t=t.replace(/\s+/g," ").trim();
+    const letters=(t.match(/[A-Za-z]/g)||[]).length;
+    if(letters>=3&&letters/t.replace(/\s/g,"").length>0.5)desc.push(t);
+  });
+  let d=psaCase(desc.join(" "));
+  if(d&&num)d+=" #"+num;
+  if(d&&gn)d+=" PSA "+gn;else if(d&&gw==="AUTHENTIC")d+=" PSA Authentic";
+  return{cert,desc:d,grade:gn,num,raw:all};
+}
+async function ocrCanvas(cv){
+  const w=await ocrReady();
+  const r=await w.recognize(cv);
+  return parseLabel(r&&r.data?r.data.text:"");
+}
+// crop the scan box out of a live video frame, scaled up so small label text reads well
+function guideCanvas(video,guide){
+  const vr=video.getBoundingClientRect(),gr=guide.getBoundingClientRect(),vw=video.videoWidth,vh=video.videoHeight;
+  if(!vw||!vr.width)return null;
+  const k=Math.max(vr.width/vw,vr.height/vh),ox=(vr.width-vw*k)/2,oy=(vr.height-vh*k)/2;
+  const pad=0.08;let x=(gr.left-vr.left-ox)/k,y=(gr.top-vr.top-oy)/k,w=gr.width/k,h=gr.height/k;
+  x-=w*pad;y-=h*pad;w*=1+2*pad;h*=1+2*pad;x=Math.max(0,x);y=Math.max(0,y);w=Math.min(vw-x,w);h=Math.min(vh-y,h);
+  const sc=Math.min(2.5,Math.max(1,1600/w)),cv=document.createElement("canvas");cv.width=Math.round(w*sc);cv.height=Math.round(h*sc);
+  const ctx=cv.getContext("2d");ctx.filter="grayscale(1) contrast(1.25)";ctx.drawImage(video,x,y,w,h,0,0,cv.width,cv.height);
+  return cv;
+}
+async function imageCanvas(blob,max){
+  const bmp=window.createImageBitmap?await createImageBitmap(blob):await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(blob)});
+  const W=bmp.width||bmp.naturalWidth,H=bmp.height||bmp.naturalHeight,k=Math.min(1,(max||2200)/Math.max(W,H));
+  const cv=document.createElement("canvas");cv.width=Math.round(W*k);cv.height=Math.round(H*k);
+  const ctx=cv.getContext("2d");ctx.filter="grayscale(1) contrast(1.25)";ctx.drawImage(bmp,0,0,cv.width,cv.height);return cv;
+}
+function ocrOn(){try{return localStorage.getItem("repack-ocr")!=="0"}catch(e){return true}}
+
 // ---------- PSA lookup ----------
 const PSA_UP=new Set(["GX","EX","V","VMAX","VSTAR","IR","SIR","SAR","AR","UR","HR","CHR","TG","GG","PSA","SV","SWSH","XY","SM","BW","DX","CS","CBB","JP","EN","PR","LV.X","TAG","TEAM","BREAK","PRIME","MEGA"].map(x=>x.toUpperCase()));
 function psaCase(str){
   return String(str||"").trim().split(/\s+/).map(w=>w.split("-").map(p=>{
-    if(!p)return p;if(/\d/.test(p))return p;if(p===p.toLowerCase())return p;
+    if(!p)return p;if(/\d/.test(p))return p;if(p===p.toLowerCase())return p;if(/\./.test(p)&&p.length<=5&&p===p.toUpperCase())return p;
     if(PSA_UP.has(p.toUpperCase())&&p.toUpperCase()!=="MEGA")return p.toUpperCase();return p.charAt(0).toUpperCase()+p.slice(1).toLowerCase();
   }).join("-")).join(" ");
 }
@@ -1263,11 +1336,18 @@ function cardModal(id,carry){
     if(!ok)camOff();
   });
   let cvBusy=false;
-  const cvSnap=async()=>{if(cvBusy)return;cvBusy=true;shutterFx($("#cvw",el));const st=$("#psast",el);st.className="psast";st.textContent="Reading...";const c=await snapAndRead($("#cv",el),$("#cvw",el));cvBusy=false;if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c}else{beep(false);st.className="psast err";st.textContent="No code found. Move a little closer and tap again."}};
+  const fillName=o=>{if(o&&o.desc&&!f.desc.value.trim()){f.desc.value=o.desc;return true}return false};
+  const cvSnap=async()=>{if(cvBusy)return;cvBusy=true;shutterFx($("#cvw",el));const st=$("#psast",el);st.className="psast";st.textContent="Reading...";
+    const cvO=ocrOn()?guideCanvas($("#cv",el),$("#cvw .guide",el)):null;
+    let c=await snapAndRead($("#cv",el),$("#cvw",el)),o=null;
+    if(cvO){try{o=await ocrCanvas(cvO)}catch(e){}}
+    cvBusy=false;if(!c&&o&&o.cert)c=o.cert;
+    const named=fillName(o);
+    if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c+(named?" and the card name":"")}else if(named){camOff();beep(true);st.className="psast ok";st.textContent="Read the card name. Type or scan the cert."}else{beep(false);st.className="psast err";st.textContent="Nothing read. Fit the label in the box and tap again."}};
   $("#cvsnap",el).addEventListener("click",cvSnap);$("#cvtap",el).addEventListener("click",cvSnap);
   const certph=$("#certph",el);
   $("#certphb",el).addEventListener("click",()=>{camOff();certph.value="";certph.click()});
-  certph.addEventListener("change",async()=>{const file=certph.files[0];if(!file)return;const st=$("#psast",el);st.className="psast";st.textContent="Reading barcode...";const c=await readBarcodeFromImage(file);if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c}else{beep(false);st.className="psast err";st.textContent="No barcode found in that photo. Get closer to the label, or type the number."}});
+  certph.addEventListener("change",async()=>{const file=certph.files[0];if(!file)return;const st=$("#psast",el);st.className="psast";st.textContent="Reading label...";let c=await readBarcodeFromImage(file),o=null;if(ocrOn()){try{o=await ocrCanvas(await imageCanvas(file,2200))}catch(e){}}if(!c&&o&&o.cert)c=o.cert;const named=fillName(o);if(c){gotCert(c);st.className="psast ok";st.textContent="Read cert "+c+(named?" and the card name":"")}else if(named){st.className="psast ok";st.textContent="Read the card name. Type or scan the cert."}else{beep(false);st.className="psast err";st.textContent="Nothing read in that photo. Get closer to the label, or type the number."}});
   const cashNow=()=>f.disp.value==="sold"?(+f.soldPrice.value||0):f.disp.value==="traded"?(+f.tradeCash.value||0):0;
   const pv=()=>{$("#pv",el).textContent="Payout: "+money(payoutOf({mv:f.mv.value,pct:f.pct.value}))};
   const spv=()=>{
