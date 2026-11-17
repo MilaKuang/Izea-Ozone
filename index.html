@@ -332,6 +332,13 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .cwbal{background:var(--chip);border-radius:14px;padding:12px 14px;margin:10px 0}
 .cwbal>div{display:flex;justify-content:space-between;margin-top:6px;font-size:15px}
 .cwbal small{display:block;margin-top:8px;font-size:12px;color:var(--mute)}
+.oldwk{margin-bottom:12px}
+.owtop{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.owtop span{font-size:12px;color:var(--mute)}
+.owbal>div{display:flex;justify-content:space-between;margin-top:6px;font-size:14px}
+.owbal b{font-variant-numeric:tabular-nums}
+.owact{display:flex;gap:8px;margin-top:10px}
+.owact .btn{flex:1}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -416,7 +423,7 @@ async function fetchAll(table,order){
   return out;
 }
 async function loadAll(){
-  const [st,wk,cd,sp,po,at,au,mb,rp,rq,lq]=await Promise.all([
+  const [st,wk,cd,sp,po,at,au,mb,rp,rq,lq,kq]=await Promise.all([
     sb.from("settings").select("*").eq("id",1).single(),
     sb.from("weeks").select("*").order("start_date",{ascending:true}),
     fetchAll("cards"),fetchAll("spend"),fetchAll("payouts"),fetchAll("attachments","created_at"),
@@ -424,7 +431,8 @@ async function loadAll(){
     sb.from("members").select("*"),
     sb.from("cards").select("repack_status").limit(1),
     sb.from("cards").select("repacker").limit(1),
-    sb.from("spend").select("kind").limit(1)
+    sb.from("spend").select("kind").limit(1),
+    sb.from("cards").select("carried").limit(1)
   ]);
   for(const r of [st,wk,au])if(r.error)throw r.error;
   const by=(rows,map)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.week_id))m.set(r.week_id,[]);m.get(r.week_id).push(map(r))});return m};
@@ -434,7 +442,7 @@ async function loadAll(){
   if(!open)throw new Error("No open week found. Re-run setup.sql.");
   const history=wk.data.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
   const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
-  state={hasCost:false,hasLoan:!!(lq&&!lq.error),hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
+  state={hasCarried:!!(kq&&!kq.error),hasCost:false,hasLoan:!!(lq&&!lq.error),hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
   ui.offline=false;
   try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state}))}catch(e){}
 }
@@ -461,7 +469,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=34;
+const APP_VERSION=35;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -518,7 +526,7 @@ const payoutOf=c=>Math.round((+c.mv||0)*(+c.pct||0))/100;
 const cashIn=c=>c.saleType==="traded"?(+c.tradeCash||0):(+c.soldPrice||0);
 function calc(w){
   // slabs carried out of a week count at their payout there; in the next week they arrive with that payout as their cost
-  const stock=w.cards.filter(c=>!c.sold&&!c.carried),sold=w.cards.filter(c=>c.sold),out=w.cards.filter(c=>!c.sold&&c.carried),carriedN=out.length;
+  const stock=w.cards.filter(c=>!c.sold),sold=w.cards.filter(c=>c.sold),out=[],carriedN=w.cards.filter(c=>!c.sold&&c.carried).length;
   const mv=sum(stock,c=>c.mv),due=sum(stock,payoutOf),proceeds=sum(sold,cashIn),carriedOut=round2(sum(out,payoutOf)),carryIn=round2(sum(w.cards,c=>+c.carryCost||0)),carryInDone=round2(sum(w.cards.filter(c=>c.sold||c.carried||c.repack==="accepted"),c=>+c.carryCost||0));
   const spent=sum(w.spend.filter(x=>x.kind!=="loan"&&x.kind!=="carry"),x=>x.amount),paid=sum(w.payouts,x=>x.amount),cost=round2(spent+carryIn);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),ssp=sum(so,c=>c.soldPrice);
@@ -759,7 +767,7 @@ function cardRowHTML(c,edit,view){
   const pre=edit==="sel"?'<span class="selc'+(picked?" on":"")+'">'+(picked?ic("check",15):"")+"</span>":"";
   const first=n?attachList(c.id)[0]:null;
   const th='<div class="thumbsm '+(first?"":oc)+'">'+(first?'<img data-path="'+esc(first.path)+'" alt="">':ic("cards",20))+"</div>";
-  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Carried to next week</span>':"")+(+c.carryCost?'<span class="badge ok">From last week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+costPill;
+  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Still selling</span>':"")+(+c.carryCost?'<span class="badge ok">From last week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+costPill;
   return '<div class="row'+(act?"":" static")+(picked?" picked":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
 function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"&&c.repack!=="pending"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
@@ -796,6 +804,12 @@ function soldHero(cs){
   const top='<span>Total sales</span><b class="big">'+money(sales)+"</b>";
   return '<div class="hero">'+top+'<div class="hstats h4"><div><span>Sold</span><b>'+sold.length+'</b></div><div><span>Avg % mkt</span><b>'+(avg==null?"n/a":avg.toFixed(1)+"%")+"</b></div></div></div>";
 }
+function earlierSection(){
+  const f=ui.filter||"all";if(f==="sold")return "";
+  const list=stillSelling().filter(x=>f==="all"||statusOk(x.c,f));if(!list.length)return "";
+  return '<div class="sech"><h3>From earlier weeks ('+list.length+')</h3></div><p class="hint" style="margin:-4px 2px 8px">Still selling. These count toward the week they came from, not this week.</p><div class="hydr">'+list.map(x=>cardRowHTML(x.c,true,false).replace('data-act="edit-card"','data-act="edit-old"').replace('<div class="pills">','<div class="pills"><span class="badge rp-accepted">'+esc(weekTag(x.h))+"</span>")).join("")+"</div>";
+}
+const weekTag=h=>"Week of "+fmtDate(h.start);
 function cardsView(){
   const t=calc(state.week),P=state.settings.partners,cs=state.week.cards.filter(c=>!ui.owner||c.owner===ui.owner);
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
@@ -807,7 +821,7 @@ function cardsView(){
   '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
   '<div class="minis"><select class="mini" id="sortsel" aria-label="Sort">'+opt("new","Newest first",ui.sort)+opt("value","Highest value",ui.sort)+opt("low","Lowest value",ui.sort)+opt("name","Name A-Z",ui.sort)+opt("age","Longest in stock",ui.sort)+'</select><select class="mini" id="ownersel" aria-label="Owner">'+opt("","All owners",ui.owner)+opt(P[0],P[0],ui.owner)+opt(P[1],P[1],ui.owner)+opt("Shared","Shared",ui.owner)+"</select></div>"+
   (ui.filter==="need"&&!ui.sel&&state.week.cards.some(c=>!c.sold&&c.cert&&!c.desc)?'<button class="btn sec block" style="margin-bottom:10px" data-act="psa-fill">'+ic("scan",18)+"Fill missing names from PSA</button>":"")+
-  '<div id="cardlist">'+cardListHTML()+"</div>";
+  '<div id="cardlist">'+cardListHTML()+"</div>"+(ui.sel?"":earlierSection());
 }
 function entryRow(x,kind,act){
   const n=attachN(x.id),pay=kind!=="spend",loan=!pay&&x.kind==="loan";
@@ -863,9 +877,16 @@ function profitPair(w){
   const t=calc(w),box=(lbl,v,sub)=>'<div class="ppbox"><span class="lbl">'+lbl+'</span><b class="'+(v<0?"neg":"")+'">'+money(v)+"</b><small>"+sub+"</small></div>";
   return '<div class="grid2 pp">'+box("Profit sold so far",t.soldProfit,"Sales + accepted - spent")+box("If everything sells",t.profit,"Sold + unsold at payout - spent")+"</div>";
 }
+function earlierMoney(){
+  // a past week stays here until its slabs are sold and both partners are owed $0
+  return state.history.filter(h=>h.cards.some(c=>c.carried&&!c.sold)||state.settings.partners.some(p=>Math.abs(pcalc(h,p).left)>=0.01)).map(h=>{
+    const open=h.cards.filter(c=>c.carried&&!c.sold).length;
+    return '<div class="cardbox oldwk"><div class="owtop"><b>'+esc(weekTag(h))+'</b><span>'+(open?plural(open,"slab")+" still selling":"All sold")+'</span></div><div class="owbal">'+state.settings.partners.map(p=>'<div><span>'+esc(p)+' still owed</span><b class="'+(pcalc(h,p).left<0?"neg":"")+'">'+money(pcalc(h,p).left)+"</b></div>").join("")+'</div><div class="owact"><button class="btn sm sec" data-act="open-hist" data-id="'+h.id+'">Open week</button><button class="btn sm" data-act="add-entry" data-kind="payouts" data-week="'+h.id+'">'+ic("plus",16)+"Add payout</button></div></div>";
+  }).join("");
+}
 function moneyView(){
   const w=state.week;
-  return partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
+  return earlierMoney()+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
   '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+moneyFilter("payouts",w.payouts);
 }
 function tilesFor(t){
@@ -900,9 +921,10 @@ function ledgerStatic(w){
   return all.map(x=>entryRow(x,x.k,false)).join("");
 }
 function histDetail(h){
+  const open=h.cards.filter(c=>c.carried&&!c.sold).length;
   return tilesFor(calc(h))+'<div class="sech"><h3>Partners</h3></div>'+partnerTable(h)+'<div class="sech"><h3>Export</h3></div>'+exportButtons(h.id)+
-  '<div class="sech"><h3>Cards ('+h.cards.length+')</h3></div><div class="hydr">'+(h.cards.length?h.cards.slice().reverse().map(c=>cardRowHTML(c,false,true)).join(""):emptyBox("cards","No cards."))+"</div>"+
-  '<div class="sech"><h3>Money</h3></div>'+ledgerStatic(h)+
+  '<div class="sech"><h3>Cards ('+h.cards.length+')</h3></div>'+(open?'<p class="hint" style="margin:-4px 2px 8px">'+plural(open,"slab")+" still selling. Tap a slab to mark it sold. The sale counts toward this week.</p>":"")+'<div class="hydr">'+(h.cards.length?h.cards.slice().reverse().map(c=>cardRowHTML(c,true,false).replace('data-act="edit-card"','data-act="edit-old"')).join(""):emptyBox("cards","No cards."))+"</div>"+
+  '<div class="sech"><h3>Money</h3><button class="btn sm" data-act="add-entry" data-kind="payouts" data-week="'+h.id+'">'+ic("plus",16)+'Add payout</button></div>'+(h.spend.length+h.payouts.length?[...h.spend.map(x=>entryRow(x,"spend",true)),...h.payouts.map(x=>entryRow(x,"payouts",true))].join(""):emptyBox("money","Nothing recorded."))+
   '<div class="sech"><h3>Manage</h3></div><div class="quick q2"><button class="qbtn" data-act="rename-week" data-id="'+h.id+'">'+ic("edit")+'Rename week</button><button class="qbtn dz" data-act="del-hist" data-id="'+h.id+'">'+ic("trash")+"Delete week</button></div>";
 }
 function weekMenu(id){
@@ -1410,8 +1432,13 @@ function wireSeg(el){
     sl.addEventListener("change",paintSeg);paintSeg();
   });
 }
+const weekById=id=>id===state.week.id?state.week:state.history.find(h=>h.id===id);
+const weekOfCard=id=>[state.week,...state.history].find(x=>x.cards.some(c=>c.id===id));
+const weekOfEntry=(kind,id)=>[state.week,...state.history].find(x=>x[kind].some(e=>e.id===id));
+// slabs from closed weeks that are still being sold
+const stillSelling=()=>state.history.flatMap(h=>h.cards.filter(c=>c.carried&&!c.sold).map(c=>({c,h})));
 function cardModal(id,carry){
-  const w=state.week,c=id?w.cards.find(x=>x.id===id):null;
+  const w=(id&&weekOfCard(id))||state.week,c=id?w.cards.find(x=>x.id===id):null;
   if(id&&!c){toast("That card was changed or removed");return}
   const d=c||Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,saleType:"",soldPrice:"",soldDate:"",tradeCash:"",notes:""},carry||{});
   const dsp=dispOf(d);
@@ -1571,8 +1598,8 @@ function bulkModal(){
     closeModal();await refreshRender();toast(n+" added"+(certs.length-n?", "+(certs.length-n)+" duplicates skipped":""));
   });
 }
-function entryModal(kind,id){
-  const w=state.week,list=w[kind],x=id?list.find(e=>e.id===id):null;
+function entryModal(kind,id,weekId){
+  const w=(weekId&&weekById(weekId))||(id&&weekOfEntry(kind,id))||state.week,list=w[kind],x=id?list.find(e=>e.id===id):null;
   if(id&&!x){toast("That entry was changed or removed");return}
   const d=x||{partner:state.settings.partners[0],amount:"",date:todayISO(),note:""};
   const nm=kind==="spend"?"spend (a buy)":"payout",P=state.settings.partners,canLoan=false,isLoan=canLoan&&d.kind==="loan";
@@ -1668,22 +1695,32 @@ function bulkDeleteModal(){
     removeFiles(paths);ui.sel=null;closeModal();await refreshRender();toast(plural(ok,"card")+" deleted");
   });
 }
-// closing a week saves it to History and starts an empty week; nothing carries over
+// closing a week saves it to History and starts an empty week; slabs you keep selling stay in this week and show in Cards under "From earlier weeks"
 function closeWeekModal(){
   const w=state.week,label="Week of "+fmtDate(w.start)+" - "+fmtDate(todayISO());
-  const t=calc(w),unsold=w.cards.filter(c=>!c.sold&&c.repack!=="accepted").length;
-  const el=modal('<h2>Close this week</h2><p class="hint">Saves '+w.cards.length+" cards, "+w.spend.length+" spend and "+w.payouts.length+" payout entries to History for everyone (spent "+money(t.spent)+"), then starts an empty week.</p><form id=\"wf\">"+field("Name",'<input name="label" value="'+esc(label)+'">')+
-    (unsold?'<p class="hint">'+plural(unsold,"slab")+" not sold or accepted yet. They stay in this week's History and do not move to the new week.</p>":"")+
+  const t=calc(w),unsold=w.cards.filter(c=>!c.sold);
+  const pick=new Set(unsold.map(c=>c.id));
+  const tag=c=>c.repack==="accepted"?'<span class="badge rp-accepted">Taken by '+esc(c.repacker||"repacker")+"</span>":c.repack==="rejected"?'<span class="badge rp-rejected">Not taken</span>':c.repack==="pending"?'<span class="badge rp-pending">Pending</span>':'<span class="badge ok">In stock</span>';
+  const el=modal('<h2>Close this week</h2><p class="hint">Saves '+w.cards.length+" cards, "+w.spend.length+" spend and "+w.payouts.length+" payout entries to History for everyone, then starts an empty week.</p><form id=\"wf\">"+field("Name",'<input name="label" value="'+esc(label)+'">')+
+    (unsold.length&&state.hasCarried?'<div class="sech"><h3>Keep selling</h3></div><p class="hint" style="margin:-4px 0 6px">Checked slabs stay part of this week but keep showing in Cards under "From earlier weeks". When they sell, the money counts toward this week, so both partners reach $0 once everything is sold and paid out.</p><div class="cwbar"><span id="cwn"></span><span><button class="linkbtn" type="button" id="cwall">All</button> <button class="linkbtn" type="button" id="cwnone">None</button></span></div><div class="cwlist">'+unsold.map(c=>'<label class="cwrow"><input type="checkbox" data-cid="'+c.id+'" checked><span class="main"><span class="desc">'+esc(c.desc||"(no description)")+'</span><span class="sub">'+(c.cert?"Cert "+esc(c.cert)+" | ":"")+money(payoutOf(c))+" payout</span></span>"+tag(c)+"</label>").join("")+"</div>":"")+
     '<div class="actions"><button class="btn" type="submit">Continue</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div></form>');
-  const f=$("#wf",el);
+  const f=$("#wf",el),box=el.querySelector(".cwlist");
+  const sync=()=>{const n=$("#cwn",el);if(n)n.textContent=pick.size+" of "+unsold.length+" selected"};
+  if(box){
+    box.querySelectorAll("[data-cid]").forEach(x=>x.addEventListener("change",()=>{x.checked?pick.add(x.dataset.cid):pick.delete(x.dataset.cid);sync()}));
+    const setAll=on=>{box.querySelectorAll("[data-cid]").forEach(x=>{x.checked=on;on?pick.add(x.dataset.cid):pick.delete(x.dataset.cid)});sync()};
+    $("#cwall",el).addEventListener("click",()=>setAll(true));$("#cwnone",el).addEventListener("click",()=>setAll(false));sync();
+  }else pick.clear();
   f.addEventListener("submit",e=>{
-    e.preventDefault();const name=f.label.value.trim()||label;
-    el.innerHTML='<div class="grab"></div><div class="dzic" style="background:var(--warn);color:var(--warn-ink)">'+ic("history",26)+'</div><h2 class="center">Close the week for everyone?</h2><p class="hint center"><b>'+esc(name)+'</b> moves to History and a fresh, empty week starts on every phone.</p><div class="counts"><div><b>'+w.cards.length+'</b><span>cards</span></div><div><b>'+(w.spend.length+w.payouts.length)+'</b><span>money entries</span></div><div><b>'+money(t.soldProfit)+'</b><span>sold profit</span></div></div><label class="chk"><input type="checkbox" id="cwclear" checked>Also clear the activity log</label><p class="hint" style="margin:2px 0 0 30px">Keeps storage small. <button class="linkbtn" id="cwaud" type="button" style="padding:0">Download it as a CSV first</button></p><div class="actions"><button class="btn" id="cwyes" type="button">Yes, close week</button><button class="btn sec" id="cwback" type="button">Go back</button></div>';
+    e.preventDefault();const name=f.label.value.trim()||label,ids=[...pick],keep=ids.length;
+    el.innerHTML='<div class="grab"></div><div class="dzic" style="background:var(--warn);color:var(--warn-ink)">'+ic("history",26)+'</div><h2 class="center">Close the week for everyone?</h2><p class="hint center"><b>'+esc(name)+'</b> moves to History and a fresh, empty week starts on every phone.</p><div class="counts"><div><b>'+w.cards.length+'</b><span>cards</span></div><div><b>'+(w.spend.length+w.payouts.length)+'</b><span>money entries</span></div><div><b>'+keep+'</b><span>still selling</span></div></div><p class="hint center">'+(keep?plural(keep,"slab")+" will show in Cards under From earlier weeks until sold.":"No slabs keep selling.")+'</p><label class="chk"><input type="checkbox" id="cwclear" checked>Also clear the activity log</label><p class="hint" style="margin:2px 0 0 30px">Keeps storage small. <button class="linkbtn" id="cwaud" type="button" style="padding:0">Download it as a CSV first</button></p><div class="actions"><button class="btn" id="cwyes" type="button">Yes, close week</button><button class="btn sec" id="cwback" type="button">Go back</button></div>';
     $("#cwback",el).addEventListener("click",()=>closeWeekModal());
     $("#cwaud",el).addEventListener("click",()=>exportAudit());
     $("#cwyes",el).addEventListener("click",async()=>{
       el.querySelectorAll("button").forEach(b=>b.disabled=true);
       const clear=$("#cwclear",el).checked;let note="";
+      // flag the slabs that keep selling before the week closes
+      if(keep){const r0=await api(sb.from("cards").update({carried:true}).in("id",ids));if(!r0){el.querySelectorAll("button").forEach(b=>b.disabled=false);return}}
       const call=async a=>{try{return await sb.rpc("close_week",a)}catch(x){return{error:x}}};
       const missing=r=>r&&r.error&&(r.error.code==="PGRST202"||/close_week/.test(String(r.error.message||"")));
       let r=await call({p_label:name,p_carry:false,p_clear_activity:clear});
@@ -1934,7 +1971,8 @@ const actions={
   "scan-certs"(){scanModal()},
   "import-csv"(){importChooser()},
   "sel-repack"(){repackBulkModal()},
-  "add-entry"(id,t){entryModal(t.dataset.kind,null)},
+  "add-entry"(id,t){entryModal(t.dataset.kind,null,t.dataset.week||null)},
+  "edit-old"(id){cardModal(id)},
   "edit-entry"(id,t){entryModal(t.dataset.kind,id)},
   "close-week"(){closeWeekModal()},
   settings(){settingsModal()},
