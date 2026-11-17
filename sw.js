@@ -1,4 +1,4 @@
-const CACHE = "repack-ledger-v35";
+const CACHE = "repack-ledger-v36";
 const ASSETS = ["./", "./index.html", "./zxing.min.js", "./supabase.js", "./config.js", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
