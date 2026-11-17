@@ -378,8 +378,6 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .hero.compact small{font-size:12px}
 .hero.compact .hstats{margin-top:10px;padding-top:9px}
 .hero.compact .hstats b{font-size:16px}
-.hero .neg,.hero .big.neg,.hero b.neg{color:#fff}
-.hero .big.neg::after{content:"loss";display:inline-block;vertical-align:middle;margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(255,255,255,.2);border-radius:99px;padding:3px 8px}
 .quick.inline{gap:6px;margin-bottom:12px}
 .quick.inline .qbtn{flex-direction:row;gap:6px;padding:8px 6px;border-radius:12px;font-size:12.5px}
 .prow .btn{min-height:44px}
@@ -533,7 +531,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=37;
+const APP_VERSION=38;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
