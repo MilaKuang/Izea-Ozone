@@ -339,6 +339,35 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .owbal b{font-variant-numeric:tabular-nums}
 .owact{display:flex;gap:8px;margin-top:10px}
 .owact .btn{flex:1}
+.wkbar{display:flex;align-items:center;gap:6px;margin:0 0 12px}
+.wkarr{flex:none;width:40px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);display:grid;place-items:center}
+.wkarr:disabled{opacity:.35}
+.wkarr.fwd svg{transform:scaleX(-1)}
+.wkname{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:6px 10px;display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--ink)}
+.wkname b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.caret{font-style:normal;font-size:11px;color:var(--mute)}
+.wkst{font-size:11.5px;font-weight:600;color:var(--mute)}
+.wkst.open{color:var(--acc)}.wkst.sell{color:var(--warn-ink)}.wkst.owed{color:var(--neg)}.wkst.done{color:var(--pos)}
+.wkbar.past .wkname{border-color:var(--warn);background:var(--warn-bg,var(--card))}
+.pastbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:8px 10px;margin:-4px 0 12px;font-size:13px;font-weight:600}
+.pastbar .btn{flex:none}
+.wklist{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
+.wkrow{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:10px 12px;color:var(--ink)}
+.wkrow.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+.wkrow .main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.wkrow small{font-size:12px;color:var(--mute)}
+.wkrow .amt{text-align:right}
+.warnbox{background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:13px}
+.lopts{display:flex;flex-direction:column;gap:2px;margin-top:10px;text-align:left}
+#lockscr{position:fixed;inset:0;z-index:200;background:var(--bg);display:grid;place-items:center;padding:24px}
+.lockin{width:100%;max-width:320px;text-align:center}
+.lockin img{width:72px;height:72px;border-radius:18px;margin-bottom:10px}
+.lockin h1{font-size:22px;margin:0}
+.lockin .btn{margin-top:18px}
+#splash{position:fixed;inset:0;z-index:300;background:var(--bg);display:grid;place-items:center;pointer-events:none;animation:splashOut .22s ease-in .34s forwards}
+#splash img{width:84px;height:84px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.18);animation:splashIn .34s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes splashIn{from{transform:scale(.72);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes splashOut{to{opacity:0;visibility:hidden}}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -370,6 +399,13 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><img src="icon-192.png" alt=""></div>
+<script>
+// short launch animation on a fresh start only; gone in under 0.6s
+(function(){var el=document.getElementById("splash");if(!el)return;
+  if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){el.remove();return}
+  el.addEventListener("animationend",function(e){if(e.target===el)el.remove()});setTimeout(function(){if(el.parentNode)el.remove()},900)})();
+</script>
 <div id="app"></div>
 <input type="file" id="csvin" accept=".csv,text/csv,text/plain" hidden>
 <script src="config.js"></script>
@@ -469,7 +505,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=35;
+const APP_VERSION=36;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -569,7 +605,7 @@ function parseDate(v){v=String(v||"").trim();let m=v.match(/^(\d{4})-(\d{1,2})-(
 
 async function exportFile(name,text,mime){
   mime=mime||"text/csv";
-  const blob=new Blob([text],{type:mime});
+  const blob=text instanceof Blob?text:new Blob([text],{type:mime});
   try{
     const file=new File([blob],name,{type:mime});
     if(/iPhone|iPad|Android/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[file]})){
@@ -624,13 +660,22 @@ function renderLogin(){
   if(ui.denied){
     $("#app").innerHTML='<div class="welcome"><h1>No access</h1><p class="hint">'+esc(ui.denied)+' is signed in but is not on the members list. Ask Alex to add this email, then sign in again.</p><button class="btn block" data-act="sign-out">Sign out</button></div>';return;
   }
-  $("#app").innerHTML='<div class="welcome"><img class="wlogo" src="icon-192.png" alt=""><h1>Repack Ledger</h1><p class="hint">Sign in with your email and password.</p><form id="lf"><input name="email" type="email" autocomplete="username" placeholder="Email" required><input name="pw" type="password" autocomplete="current-password" placeholder="Password" style="margin-top:8px" required><button class="btn block" style="margin-top:12px" type="submit">Sign in</button></form><button class="btn sec block" data-act="forgot">Forgot password</button></div>';
+  $("#app").innerHTML='<div class="welcome"><img class="wlogo" src="icon-192.png" alt=""><h1>Repack Ledger</h1><p class="hint">Sign in with your email and password.</p><form id="lf"><input name="email" type="email" autocomplete="username" placeholder="Email" required value="'+esc(localStorage.getItem(EMAIL_KEY)||"")+'"><input name="pw" type="password" autocomplete="current-password" placeholder="Password" style="margin-top:8px" required><div class="lopts"><label class="chk"><input type="checkbox" name="remember"'+(localStorage.getItem(EMAIL_KEY)?" checked":"")+'>Remember email</label><label class="chk"><input type="checkbox" name="stay"'+(localStorage.getItem(EPHEMERAL_KEY)==="1"?"":" checked")+'>Stay signed in</label><label class="chk" id="fidopt" hidden><input type="checkbox" name="faceid"'+(lockInfo()?" checked":"")+'>Use Face ID to unlock</label></div><button class="btn block" style="margin-top:12px" type="submit">Sign in</button></form><button class="btn sec block" data-act="forgot">Forgot password</button></div>';
   const f=$("#lf");
+  faceIdAvailable().then(ok=>{const o=$("#fidopt");if(o&&ok)o.hidden=false});
   f.addEventListener("submit",async e=>{
     e.preventDefault();busy(f,true);
-    const {data,error}=await sb.auth.signInWithPassword({email:f.email.value.trim(),password:f.pw.value}).catch(x=>({error:x}));
+    const email=f.email.value.trim();
+    const {data,error}=await sb.auth.signInWithPassword({email,password:f.pw.value}).catch(x=>({error:x}));
     if(error||!data||!data.session){busy(f,false);toast(error&&/invalid/i.test(error.message)?"Wrong email or password":errText(error));return}
+    if(f.remember.checked)localStorage.setItem(EMAIL_KEY,email);else localStorage.removeItem(EMAIL_KEY);
+    if(f.stay.checked)localStorage.removeItem(EPHEMERAL_KEY);else localStorage.setItem(EPHEMERAL_KEY,"1");
+    sessionStorage.setItem("repack-alive","1");
+    const wantFace=f.faceid&&f.faceid.checked&&!$("#fidopt").hidden;if(!(f.faceid&&f.faceid.checked))disableFaceId();
     await enter(data.session);
+    // Face ID needs its own tap on iPhone, so ask right after sign in
+    if(wantFace&&me&&!lockInfo()){const el=modal('<div class="dzic" style="background:var(--acc-soft);color:var(--acc)">'+ic("lock",26)+'</div><h2 class="center">Turn on Face ID?</h2><p class="hint center">Unlock Repack Ledger with Face ID on this phone. You stay signed in.</p><div class="actions"><button class="btn" id="fidyes">Turn on Face ID</button><button class="btn sec" data-act="close-modal">Not now</button></div>');
+      $("#fidyes",el).addEventListener("click",async()=>{if(await enrollFaceId())closeModal()})}
   });
 }
 function renderNewPassword(){
@@ -721,8 +766,30 @@ function whoModal(){
 }
 function tile(label,val,sub,cls){return '<div class="tile"><span>'+esc(label)+'</span><b class="'+(cls||"")+'">'+val+"</b>"+(sub?"<small>"+sub+"</small>":"")+"</div>"}
 function emptyBox(icon,text){return '<div class="empty">'+ic(icon,28)+"<p>"+text+"</p></div>"}
+// the week Cards, Money and Summary are showing; null means this week
+const VW=()=>(ui.vw&&state.history.find(h=>h.id===ui.vw))||state.week;
+const isPast=()=>VW()!==state.week;
+const weekList=()=>[state.week,...state.history.slice().sort((a,b)=>(b.start||"").localeCompare(a.start||""))];
+function weekStatus(w){
+  if(w===state.week)return{cls:"open",txt:"This week"};
+  const open=w.cards.filter(c=>c.carried&&!c.sold).length,P=state.settings.partners,ow=P.map(p=>pcalc(w,p).left);
+  if(open)return{cls:"sell",txt:plural(open,"slab")+" still selling"};
+  if(ow.some(v=>Math.abs(v)>=0.01))return{cls:"owed",txt:"Owed "+P.map((p,i)=>p+" "+money(ow[i])).join(" | ")};
+  return{cls:"done",txt:"Settled"};
+}
+function weekBar(){
+  const L=weekList(),w=VW(),i=L.indexOf(w),st=weekStatus(w);
+  const nm=w===state.week?"Week of "+fmtDate(w.start):(w.label||"Week of "+fmtDate(w.start));
+  return '<div class="wkbar'+(isPast()?" past":"")+'"><button class="wkarr" data-act="week-step" data-id="1"'+(i>=L.length-1?" disabled":"")+' aria-label="Older week">'+ic("back",18)+'</button><button class="wkname" data-act="week-pick"><b>'+esc(nm)+' <i class="caret">&#9662;</i></b><span class="wkst '+st.cls+'">'+esc(st.txt)+'</span></button><button class="wkarr fwd" data-act="week-step" data-id="-1"'+(i<=0?" disabled":"")+' aria-label="Newer week">'+ic("back",18)+"</button></div>"+
+    (isPast()?'<div class="pastbar"><span>Viewing a past week. Changes count toward that week.</span><button class="btn sm" data-act="week-go" data-id="">Back to this week</button></div>':"");
+}
+function weekPicker(){
+  const el=modal('<h2>Choose a week</h2><div class="wklist">'+weekList().map(w=>{const st=weekStatus(w),t=calc(w),on=w===VW();
+    return '<button class="wkrow'+(on?" on":"")+'" data-act="week-go" data-id="'+(w===state.week?"":w.id)+'"><div class="main"><b>'+esc(w===state.week?"Week of "+fmtDate(w.start):w.label)+'</b><small>'+fmtDate(w.start)+(w.end?" - "+fmtDate(w.end):" - now")+" | "+plural(w.cards.length,"card")+'</small><span class="wkst '+st.cls+'">'+esc(st.txt)+'</span></div><div class="amt"><b class="'+(t.soldProfit<0?"neg":"")+'">'+money(t.soldProfit)+"</b><small>sold profit</small></div></button>"}).join("")+'</div><div class="actions"><button class="btn sec" data-act="close-modal">Close</button></div>');
+  return el;
+}
 function dueBanner(){
-  if(ui.hist)return "";
+  if(ui.hist||isPast())return "";
   const w=state.week;
   if(!(w.cards.length||w.spend.length||w.payouts.length))return "";
   const d=new Date();d.setHours(0,0,0,0);
@@ -736,13 +803,14 @@ function render(){
   if(ui.recovery){renderNewPassword();return}
   if(!me){renderLogin();return}
   if(!state){$("#app").innerHTML='<div class="welcome"><p class="hint">Loading...</p></div>';return}
-  const prev=$("#scroller"),key=ui.hist?"h:"+ui.hist:ui.tab;
+  const prev=$("#scroller"),key=ui.hist?"h:"+ui.hist:ui.tab+(ui.vw?":"+ui.vw:"");
   // remember where each screen was scrolled to; iPhones can drop a single scrollTop set after a redraw
   if(!ui.pos)ui.pos={};
   const top=ui.top?0:(ui.pos[key]||0);ui.top=false;
-  let title="Repack Ledger",sub="Week started "+fmtDate(state.week.start)+" | "+me.name,body="",back="";
+  let title="Repack Ledger",sub=me.name,body="",back="";
   if(ui.hist){const h=state.history.find(x=>x.id===ui.hist);if(h){title=h.label;sub=fmtDate(h.start)+" - "+fmtDate(h.end);body=histDetail(h);back='<button class="icon" data-act="back" aria-label="Back">'+ic("back",18)+"</button>"}else ui.hist=null}
-  if(!ui.hist){body={cards:cardsView,money:moneyView,summary:summaryView,history:historyView,activity:activityView}[ui.tab]()}
+  if(ui.vw&&!state.history.some(h=>h.id===ui.vw))ui.vw=null;
+  if(!ui.hist){body=(["cards","money","summary"].includes(ui.tab)?weekBar():"")+{cards:cardsView,money:moneyView,summary:summaryView,history:historyView,activity:activityView}[ui.tab]()}
   const tabs=[["cards","Cards"],["money","Money"],["summary","Summary"],["history","History"],["activity","Activity"]];
   document.documentElement.classList.add("shell");document.body.classList.add("shell");$("#app").classList.add("shell");
   $("#app").innerHTML='<header><div class="hl">'+(back||'<img class="logo" src="icon-192.png" alt="">')+'<div class="ht"><h1>'+esc(title)+"</h1><p>"+esc(sub)+'</p></div></div><div class="hr"><div id="presence">'+presenceHTML()+'</div><button class="avatar" data-act="settings" aria-label="Account and settings">'+avatarHTML(me.name,38)+"</button></div></header>"+
@@ -773,7 +841,7 @@ function cardRowHTML(c,edit,view){
 function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"&&c.repack!=="pending"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
 function filteredCards(){
   const q=ui.q.trim().toLowerCase();
-  const l=state.week.cards.filter(c=>statusOk(c,ui.filter)&&(!ui.owner||c.owner===ui.owner)&&(!q||(c.desc+" "+(c.cert||"")+" "+c.owner+" "+(c.notes||"")).toLowerCase().includes(q))).slice();
+  const l=VW().cards.filter(c=>statusOk(c,ui.filter)&&(!ui.owner||c.owner===ui.owner)&&(!q||(c.desc+" "+(c.cert||"")+" "+c.owner+" "+(c.notes||"")).toLowerCase().includes(q))).slice();
   const val=c=>c.sold?(+c.soldPrice||0):(+c.mv||0);
   if(ui.sort==="value")l.sort((a,b)=>val(b)-val(a));
   else if(ui.sort==="low")l.sort((a,b)=>val(a)-val(b));
@@ -785,7 +853,7 @@ function filteredCards(){
 function cardListHTML(){
   const l=filteredCards();
   if(l.length)return l.map(c=>cardRowHTML(c,ui.sel?"sel":true)).join("");
-  return state.week.cards.length?emptyBox("search","No cards match. Try another filter."):emptyBox("cards","No cards yet. Tap Scan certs or Add card.");
+  return VW().cards.length?emptyBox("search","No cards match. Try another filter."):emptyBox("cards","No cards yet. Tap Scan certs or Add card.");
 }
 function paintList(){const el=$("#cardlist");if(el){el.innerHTML=cardListHTML();hydrateThumbs(el)}}
 // top of the header for In stock, Pending and Accepted: the value of just those slabs
@@ -797,7 +865,7 @@ function filterHeroTop(cs,t){
 }
 // header when the Sold filter is on: sales, cost and profit for the sold slabs
 function soldHero(cs){
-  const sold=cs.filter(c=>c.sold),lc=lotCostsOf(state.week),val=c=>+c.soldPrice||0;
+  const sold=cs.filter(c=>c.sold),lc=lotCostsOf(VW()),val=c=>+c.soldPrice||0;
   const withCost=sold.filter(c=>lc.has(c.id)),sales=round2(sum(sold,val)),cash=round2(sum(sold,cashIn));
   const cost=round2(sum(withCost,c=>lc.get(c.id))),profit=round2(sum(withCost,val)-cost);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),avg=smv>0?sum(so,val)/smv*100:null;
@@ -811,17 +879,17 @@ function earlierSection(){
 }
 const weekTag=h=>"Week of "+fmtDate(h.start);
 function cardsView(){
-  const t=calc(state.week),P=state.settings.partners,cs=state.week.cards.filter(c=>!ui.owner||c.owner===ui.owner);
+  const t=calc(VW()),P=state.settings.partners,cs=VW().cards.filter(c=>!ui.owner||c.owner===ui.owner);
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
-  return (ui.filter==="sold"?soldHero(cs):'<div class="hero">'+(ui.filter==="all"||!ui.filter?'<span>Total market this week</span><b class="big">'+money(round2(sum(cs,c=>c.mv)))+'</b><small>Unsold market value '+money(t.mv)+" | Payout due "+money(t.due)+"</small>":filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
+  return (ui.filter==="sold"?soldHero(cs):'<div class="hero">'+(ui.filter==="all"||!ui.filter?'<span>'+(isPast()?"Total market that week":"Total market this week")+'</span><b class="big">'+money(round2(sum(cs,c=>c.mv)))+'</b><small>Unsold market value '+money(t.mv)+" | Payout due "+money(t.due)+"</small>":filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
-  '<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>")+
+  (isPast()?'<div class="quick"><button class="qbtn" data-act="sel-mode">'+ic("tag")+"Edit many</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>"))+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
   '<div class="minis"><select class="mini" id="sortsel" aria-label="Sort">'+opt("new","Newest first",ui.sort)+opt("value","Highest value",ui.sort)+opt("low","Lowest value",ui.sort)+opt("name","Name A-Z",ui.sort)+opt("age","Longest in stock",ui.sort)+'</select><select class="mini" id="ownersel" aria-label="Owner">'+opt("","All owners",ui.owner)+opt(P[0],P[0],ui.owner)+opt(P[1],P[1],ui.owner)+opt("Shared","Shared",ui.owner)+"</select></div>"+
-  (ui.filter==="need"&&!ui.sel&&state.week.cards.some(c=>!c.sold&&c.cert&&!c.desc)?'<button class="btn sec block" style="margin-bottom:10px" data-act="psa-fill">'+ic("scan",18)+"Fill missing names from PSA</button>":"")+
-  '<div id="cardlist">'+cardListHTML()+"</div>"+(ui.sel?"":earlierSection());
+  (ui.filter==="need"&&!ui.sel&&!isPast()&&state.week.cards.some(c=>!c.sold&&c.cert&&!c.desc)?'<button class="btn sec block" style="margin-bottom:10px" data-act="psa-fill">'+ic("scan",18)+"Fill missing names from PSA</button>":"")+
+  '<div id="cardlist">'+cardListHTML()+"</div>"+(ui.sel||isPast()?"":earlierSection());
 }
 function entryRow(x,kind,act){
   const n=attachN(x.id),pay=kind!=="spend",loan=!pay&&x.kind==="loan";
@@ -881,13 +949,13 @@ function earlierMoney(){
   // a past week stays here until its slabs are sold and both partners are owed $0
   return state.history.filter(h=>h.cards.some(c=>c.carried&&!c.sold)||state.settings.partners.some(p=>Math.abs(pcalc(h,p).left)>=0.01)).map(h=>{
     const open=h.cards.filter(c=>c.carried&&!c.sold).length;
-    return '<div class="cardbox oldwk"><div class="owtop"><b>'+esc(weekTag(h))+'</b><span>'+(open?plural(open,"slab")+" still selling":"All sold")+'</span></div><div class="owbal">'+state.settings.partners.map(p=>'<div><span>'+esc(p)+' still owed</span><b class="'+(pcalc(h,p).left<0?"neg":"")+'">'+money(pcalc(h,p).left)+"</b></div>").join("")+'</div><div class="owact"><button class="btn sm sec" data-act="open-hist" data-id="'+h.id+'">Open week</button><button class="btn sm" data-act="add-entry" data-kind="payouts" data-week="'+h.id+'">'+ic("plus",16)+"Add payout</button></div></div>";
+    return '<div class="cardbox oldwk"><div class="owtop"><b>'+esc(weekTag(h))+'</b><span>'+(open?plural(open,"slab")+" still selling":"All sold")+'</span></div><div class="owbal">'+state.settings.partners.map(p=>'<div><span>'+esc(p)+' still owed</span><b class="'+(pcalc(h,p).left<0?"neg":"")+'">'+money(pcalc(h,p).left)+"</b></div>").join("")+'</div><div class="owact"><button class="btn sm sec" data-act="week-go" data-id="'+h.id+'">Open week</button><button class="btn sm" data-act="week-go" data-id="'+h.id+'" data-tab="money">'+ic("plus",16)+"Add payout</button></div></div>";
   }).join("");
 }
 function moneyView(){
-  const w=state.week;
-  return earlierMoney()+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend">'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
-  '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts">'+ic("plus",16)+"Add payout</button></div>"+moneyFilter("payouts",w.payouts);
+  const w=VW(),wk=isPast()?' data-week="'+w.id+'"':"";
+  return (isPast()?"":earlierMoney())+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend"'+wk+'>'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
+  '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts"'+wk+'>'+ic("plus",16)+"Add payout</button></div>"+moneyFilter("payouts",w.payouts);
 }
 function tilesFor(t){
   const line=(lbl,v,how)=>'<div class="xrow"><div><b>'+lbl+'</b><small>'+how+'</small></div><b>'+money(v)+"</b></div>";
@@ -898,10 +966,12 @@ function partnerTable(w){
 }
 function exportButtons(id){
   const b=(k,l)=>'<button class="qbtn" data-act="exp" data-kind="'+k+'" data-id="'+id+'">'+ic("download")+l+"</button>";
-  return '<div class="quick q2">'+b("full","Full week CSV")+b("cards","Cards CSV")+b("money","Money CSV")+b("summary","Summary CSV")+"</div>";
+  return '<div class="quick q2">'+b("zip","Week + photos (ZIP)")+b("full","Full week CSV")+b("cards","Cards CSV")+b("money","Money CSV")+"</div>";
 }
 function summaryView(){
-  const w=state.week;
+  const w=VW();
+  if(isPast())return tilesFor(calc(w))+'<div class="sech"><h3>Partners</h3></div>'+partnerTable(w)+'<div class="sech"><h3>Export this week</h3></div>'+exportButtons(w.id)+
+    '<div class="sech"><h3>Manage</h3></div><div class="quick q2"><button class="qbtn" data-act="rename-week" data-id="'+w.id+'">'+ic("edit")+'Rename week</button><button class="qbtn dz" data-act="del-hist" data-id="'+w.id+'">'+ic("trash")+"Export & delete</button></div>";
   return tilesFor(calc(w))+'<div class="sech"><h3>Partners</h3></div>'+partnerTable(w)+'<div class="sech"><h3>Export this week</h3></div>'+exportButtons("current")+
   '<div class="sech"><h3>End of week</h3></div><div class="cardbox"><h3>Close week and reset</h3><p class="hint">Saves this week to History for everyone, then clears cards, spend and payouts. Weeks reset on '+DAYS[state.settings.resetDay]+'s (change in Settings).</p><button class="btn block" data-act="close-week">Close week and start new</button></div>';
 }
@@ -931,7 +1001,7 @@ function weekMenu(id){
   const h=state.history.find(x=>x.id===id);if(!h)return;
   const el=modal("<h2>"+esc(h.label)+'</h2><p class="hint">'+fmtDate(h.start)+" - "+fmtDate(h.end)+" | "+plural(h.cards.length,"card")+'</p><div class="menu"><button class="mi" data-m="open">'+ic("open")+'Open week</button><button class="mi" data-m="full">'+ic("download")+'Download full week CSV</button><button class="mi" data-m="rename">'+ic("edit")+'Rename week</button><button class="mi dz" data-m="del">'+ic("trash")+'Delete week</button></div><div class="actions"><button class="btn sec" data-act="close-modal">Cancel</button></div>');
   el.addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(!b)return;const m=b.dataset.m;
-    if(m==="open"){closeModal();ui.hist=id;ui.top=true;render()}
+    if(m==="open"){closeModal();ui.vw=id;ui.hist=null;ui.tab="summary";ui.top=true;render()}
     else if(m==="full")doExport("full",id);
     else if(m==="rename")renameWeekModal(id);
     else if(m==="del")deleteWeekModal(id);
@@ -945,14 +1015,15 @@ function renameWeekModal(id){
 }
 function deleteWeekModal(id){
   const h=state.history.find(x=>x.id===id);if(!h)return;
+  const st=weekStatus(h);
   const nPhotos=photoPaths([...h.cards,...h.spend,...h.payouts].map(x=>x.id)).length;
-  const el=modal('<div class="dzic">'+ic("trash",26)+'</div><h2 class="center">Delete this week?</h2><p class="hint center"><b>'+esc(h.label)+'</b> will be removed for everyone. This cannot be undone.</p><div class="counts"><div><b>'+h.cards.length+'</b><span>cards</span></div><div><b>'+(h.spend.length+h.payouts.length)+'</b><span>money entries</span></div><div><b>'+nPhotos+'</b><span>photos</span></div></div><button class="btn sec block" id="dwx" type="button">'+ic("download")+'<span>Download full week CSV first</span></button><label class="chk"><input type="checkbox" id="dwok">I understand this deletes it for everyone</label><div class="actions"><button class="btn dangerf" id="dwgo" type="button" disabled>'+ic("trash",18)+'Delete week</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div>');
+  const el=modal('<div class="dzic">'+ic("trash",26)+'</div><h2 class="center">Delete this week?</h2><p class="hint center"><b>'+esc(h.label)+'</b> will be removed for everyone. This cannot be undone.</p><div class="counts"><div><b>'+h.cards.length+'</b><span>cards</span></div><div><b>'+(h.spend.length+h.payouts.length)+'</b><span>money entries</span></div><div><b>'+nPhotos+'</b><span>photos</span></div></div>'+(st.cls==="done"?'<p class="hint center" style="color:var(--pos)">Settled: every slab sold and both partners are owed $0.</p>':'<div class="warnbox"><b>This week is not settled.</b> '+esc(st.txt)+". Deleting removes these numbers for good.</div>")+'<button class="btn sec block" id="dwx" type="button">'+ic("download")+'<span>Download week + photos (ZIP) first</span></button><label class="chk"><input type="checkbox" id="dwok">I understand this deletes it for everyone</label><div class="actions"><button class="btn dangerf" id="dwgo" type="button" disabled>'+ic("trash",18)+'Delete week</button><button class="btn sec" type="button" data-act="close-modal">Cancel</button></div>');
   const go=$("#dwgo",el);
-  $("#dwx",el).addEventListener("click",async e=>{const b=e.currentTarget;await doExport("full",id);b.innerHTML=ic("check")+"<span>Downloaded. Tap again to re-download</span>"});
+  $("#dwx",el).addEventListener("click",async e=>{const b=e.currentTarget;b.disabled=true;b.innerHTML=ic("download")+"<span>Preparing ZIP...</span>";await exportWeekZip(id);b.disabled=false;b.innerHTML=ic("check")+"<span>Downloaded. Tap again to re-download</span>"});
   $("#dwok",el).addEventListener("change",e=>{go.disabled=!e.target.checked});
   go.addEventListener("click",async()=>{
     el.querySelectorAll("button").forEach(b=>b.disabled=true);
-    if(await deleteWeek(id)){closeModal();ui.hist=null;ui.tab="history";await refreshRender();toast("Week deleted")}
+    if(await deleteWeek(id)){closeModal();ui.hist=null;if(ui.vw===id)ui.vw=null;ui.tab="history";await refreshRender();toast("Week deleted")}
     else el.querySelectorAll("button").forEach(b=>b.disabled=false);
   });
 }
@@ -1638,12 +1709,12 @@ function entryModal(kind,id,weekId){
   const de=$("#dele",el);if(de)de.addEventListener("click",async()=>{if(confirm("Delete this entry?")){const paths=photoPaths([id]);if(await api(sb.from(kind).delete().eq("id",id))){removeFiles(paths);closeModal();await refreshRender()}}});
 }
 function selBar(){
-  const all=state.week.cards.filter(c=>ui.sel.has(c.id)),cs=all.filter(c=>!c.sold);
+  const all=VW().cards.filter(c=>ui.sel.has(c.id)),cs=all.filter(c=>!c.sold);
   return '<div class="selbar"><div><b>'+all.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sm" data-act="sel-edit"'+(all.length?"":" disabled")+'>'+ic("edit",16)+'Edit</button><button class="btn sec sm" data-act="sel-del" aria-label="Delete selected"'+(all.length?"":" disabled")+' style="padding:6px 9px">'+ic("trash",18)+'</button><button class="btn sec sm" data-act="sel-cancel" aria-label="Done selecting" style="padding:6px 9px">'+ic("plus",18).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+"</button></div></div>";
 }
 // edit many cards at once: sold or not, sale %, repacker status, consignor %, owner. Blank means leave as is.
 function bulkEditModal(){
-  const P=state.settings.partners,cards=state.week.cards.filter(c=>ui.sel&&ui.sel.has(c.id));
+  const P=state.settings.partners,cards=VW().cards.filter(c=>ui.sel&&ui.sel.has(c.id));
   if(!cards.length){toast("Select at least one card");return}
   const reps=state.settings.repackers,totMv=sum(cards,c=>c.mv);
   const seg=(name,opts)=>'<div class="seg'+(opts.length>3?" wrap":"")+'" data-for="'+name+'">'+opts.map(o=>'<button type="button" data-v="'+esc(o[0])+'" data-h="'+esc(o[2]||"")+'">'+esc(o[1])+"</button>").join("")+'</div><div class="seghint"></div><select name="'+name+'" class="hidesel">'+opts.map(o=>'<option value="'+esc(o[0])+'">'+esc(o[1])+"</option>").join("")+"</select>";
@@ -1686,8 +1757,8 @@ function bulkEditModal(){
   });
 }
 function bulkDeleteModal(){
-  const ids=[...(ui.sel||[])].filter(id=>state.week.cards.some(c=>c.id===id));if(!ids.length){toast("Select at least one card");return}
-  const paths=photoPaths(ids),soldN=state.week.cards.filter(c=>ids.includes(c.id)&&c.sold).length;
+  const ids=[...(ui.sel||[])].filter(id=>VW().cards.some(c=>c.id===id));if(!ids.length){toast("Select at least one card");return}
+  const paths=photoPaths(ids),soldN=VW().cards.filter(c=>ids.includes(c.id)&&c.sold).length;
   const el=modal('<div class="dzic">'+ic("trash",26)+'</div><h2 class="center">Delete '+plural(ids.length,"card")+'?</h2><p class="hint center">Removes '+(ids.length===1?"it":"them")+" for everyone"+(paths.length?", along with "+plural(paths.length,"photo"):"")+". This cannot be undone."+(soldN?" "+soldN+" of these "+(soldN===1?"was":"were")+" sold, and any payouts already recorded stay in Money.":"")+'</p><div class="actions"><button class="btn dangerf" id="bdgo" type="button">'+ic("trash",18)+"Delete "+plural(ids.length,"card")+'</button><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
   $("#bdgo",el).addEventListener("click",async()=>{
     el.querySelectorAll("button").forEach(b=>b.disabled=true);let ok=0;
@@ -1736,7 +1807,7 @@ function settingsModal(){
   const others=othersOnline().map(p=>p.name),live=liveText(),liveOk=live==="Connected";
   const kv=(k,v,cls)=>'<div class="kv"><span>'+esc(k)+'</span><span class="'+(cls||"")+'">'+v+"</span></div>";
   const el=modal('<div class="prof"><button class="profav" id="avch" type="button" aria-label="'+(hasAv?"Change":"Add")+' profile photo">'+avatarHTML(me.name,84)+'<span class="cam">'+ic("camera",16)+'</span></button><div class="profname">'+esc(me.name)+'</div><div class="profmail">'+esc(me.email)+'</div><div class="proflinks"><button class="linkbtn" id="avch2" type="button">'+(hasAv?"Change photo":"Add photo")+"</button>"+(hasAv?'<button class="linkbtn dz" id="avrm" type="button">Remove</button>':"")+'</div><input type="file" id="avin" accept="image/*" hidden></div>'+
-    '<div class="sech"><h3>Account</h3></div><div class="menu" style="margin-top:0"><button class="mi" data-act="change-pw" type="button">'+ic("lock")+'<span class="mt">Change password</span><span class="chev">'+ic("open",18)+'</span></button><button class="mi dz" data-act="sign-out" type="button">'+ic("logout")+'<span class="mt">Sign out</span></button></div>'+
+    '<div class="sech"><h3>Account</h3></div><div class="menu" style="margin-top:0"><button class="mi" data-act="change-pw" type="button">'+ic("lock")+'<span class="mt">Change password</span><span class="chev">'+ic("open",18)+'</span></button><button class="mi" data-act="faceid-toggle" type="button">'+ic("lock")+'<span class="mt">Face ID lock</span><span class="chev">'+(lockInfo()?"On":"Off")+'</span></button><button class="mi dz" data-act="sign-out" type="button">'+ic("logout")+'<span class="mt">Sign out</span></button></div>'+
     '<div class="sech"><h3>Business settings</h3></div><form id="sf" class="formbox"><div class="two"><div>'+field("Partner 1",'<input name="p0" value="'+esc(s.partners[0])+'">')+"</div><div>"+field("Partner 2",'<input name="p1" value="'+esc(s.partners[1])+'">')+'</div></div><div class="two"><div>'+field("Default consignor %",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="'+s.defaultPct+'">')+"</div><div>"+field("Weekly reset day",'<select name="day">'+DAYS.map((d,i)=>'<option value="'+i+'"'+(i===s.resetDay?" selected":"")+">"+d+"</option>").join("")+"</select>")+'</div></div>'+(state.hasRepackerList?field("Repackers (comma separated)",'<input name="rps" value="'+esc(s.repackers.join(", "))+'">'):"")+'<button class="btn block" type="submit">Save settings</button></form>'+
     '<div class="sech"><h3>Data</h3></div><div class="menu" style="margin-top:0"><button class="mi" data-act="backup" type="button">'+ic("download")+'<span class="mt">Export backup<small>Everything in one file</small></span><span class="chev">'+ic("open",18)+"</span></button></div>"+
     '<div class="sech"><h3>About</h3></div><div class="kvlist">'+kv("App version",String(APP_VERSION))+(()=>{let n=0;(state.attach||new Map()).forEach(l=>{n+=l.length});const av=(state.members||[]).filter(m=>m.avatar_path).length,mb=Math.round((n*0.22+av*0.04)*10)/10;return kv("Photo storage",n+" photo"+(n===1?"":"s")+" | about "+(mb<1?"under 1":mb)+" MB of 1 GB",mb>800?"bad":"")})()+kv("Live sync",esc(live),liveOk?"ok":"bad")+kv("Online now",esc([me.name+" (you)",...others].join(", ")))+'</div><p class="tiny">Screen '+Math.round(screen.height)+" | view "+innerHeight+" | app "+Math.round(document.documentElement.getBoundingClientRect().height)+(navigator.standalone?" | home screen":"")+'</p>'+
@@ -1918,7 +1989,49 @@ async function importCSVText(text){
 }
 
 // ---------- exports ----------
+// ---------- zip (no compression) ----------
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC_T[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0}
+function makeZip(files){
+  const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+  const d=new Date(),dt=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate(),tm=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);
+  files.forEach(f=>{
+    const name=enc.encode(f.name),data=f.data,crc=crc32(data);
+    const lh=new DataView(new ArrayBuffer(30));
+    [[0,0x04034b50,4],[4,20,2],[6,0x0800,2],[8,0,2],[10,tm,2],[12,dt,2],[14,crc,4],[18,data.length,4],[22,data.length,4],[26,name.length,2],[28,0,2]].forEach(([o,v,n])=>n===4?lh.setUint32(o,v,true):lh.setUint16(o,v,true));
+    parts.push(new Uint8Array(lh.buffer),name,data);
+    const ch=new DataView(new ArrayBuffer(46));
+    [[0,0x02014b50,4],[4,20,2],[6,20,2],[8,0x0800,2],[10,0,2],[12,tm,2],[14,dt,2],[16,crc,4],[20,data.length,4],[24,data.length,4],[28,name.length,2],[30,0,2],[32,0,2],[34,0,2],[36,0,2],[38,0,4],[42,off,4]].forEach(([o,v,n])=>n===4?ch.setUint32(o,v,true):ch.setUint16(o,v,true));
+    cen.push(new Uint8Array(ch.buffer),name);
+    off+=30+name.length+data.length;
+  });
+  const csize=cen.reduce((a,b)=>a+b.length,0),end=new DataView(new ArrayBuffer(22));
+  [[0,0x06054b50,4],[4,0,2],[6,0,2],[8,files.length,2],[10,files.length,2],[12,csize,4],[16,off,4],[20,0,2]].forEach(([o,v,n])=>n===4?end.setUint32(o,v,true):end.setUint16(o,v,true));
+  return new Blob([...parts,...cen,new Uint8Array(end.buffer)],{type:"application/zip"});
+}
+// full week CSV plus every photo, named so they match the rows in the CSV
+async function exportWeekZip(id){
+  let w,label;
+  if(id==="current"){w=state.week;label=weekLabelCurrent()}else{w=state.history.find(x=>x.id===id);if(!w)return false;label=w.label}
+  const tag=id==="current"?fileTag():w.start,enc=new TextEncoder(),safe=t=>String(t||"").replace(/[^A-Za-z0-9#&.\-]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"").slice(0,60)||"item";
+  const csv=toCSV([["Summary"],...summaryRows(w,label),[],["Cards"],CARD_HEAD,...cardRows(w,label),[],["Money"],MONEY_HEAD,...moneyRows(w,label)]);
+  const files=[{name:"repack-week-"+tag+".csv",data:enc.encode(csv)}],used=new Set();
+  const jobs=[];
+  w.cards.forEach(c=>attachList(c.id).forEach((a,i)=>jobs.push({path:a.path,name:"photos/cards/"+safe((c.cert?c.cert+"-":"")+(c.desc||"card"))+(i?"-"+(i+1):"")+".jpg"})));
+  w.spend.forEach(x=>attachList(x.id).forEach((a,i)=>jobs.push({path:a.path,name:"photos/buys/"+safe((x.date||"")+"-"+x.partner+"-"+money(x.amount))+(i?"-"+(i+1):"")+".jpg"})));
+  w.payouts.forEach(x=>attachList(x.id).forEach((a,i)=>jobs.push({path:a.path,name:"photos/payouts/"+safe((x.date||"")+"-"+x.partner+"-"+money(x.amount))+(i?"-"+(i+1):"")+".jpg"})));
+  let missed=0;
+  for(let i=0;i<jobs.length;i++){
+    const j=jobs[i];if(jobs.length>3)toast("Adding photos "+(i+1)+" of "+jobs.length);
+    let nm=j.name,k=2;while(used.has(nm))nm=j.name.replace(/\.jpg$/,"-"+(k++)+".jpg");used.add(nm);
+    try{const r=await sb.storage.from("receipts").download(j.path);if(r.error||!r.data)throw r.error;files.push({name:nm,data:new Uint8Array(await r.data.arrayBuffer())})}catch(e){missed++}
+  }
+  await exportFile("repack-week-"+tag+".zip",makeZip(files),"application/zip");
+  toast("Exported "+plural(jobs.length-missed,"photo")+" with the CSV"+(missed?" ("+missed+" could not be downloaded)":""));
+  return true;
+}
 function doExport(kind,id){
+  if(kind==="zip")return exportWeekZip(id);
   let w,label;
   if(id==="current"){w=state.week;label=weekLabelCurrent()}else{w=state.history.find(x=>x.id===id);if(!w)return;label=w.label}
   const tag=id==="current"?fileTag():w.start;
@@ -1952,7 +2065,7 @@ const actions={
   "sel-edit"(){bulkEditModal()},
   "sel-cancel"(){ui.sel=null;render()},
   "money-f"(id,b){ui.mf=ui.mf||{};ui.mf[b.dataset.kind]=id||"";render()},
-  "toggle-sel"(id,row){const c=state.week.cards.find(x=>x.id===id);if(!c||!ui.sel)return;if(ui.sel.has(id))ui.sel.delete(id);else ui.sel.add(id);
+  "toggle-sel"(id,row){const c=VW().cards.find(x=>x.id===id);if(!c||!ui.sel)return;if(ui.sel.has(id))ui.sel.delete(id);else ui.sel.add(id);
     // update just this row and the bar so the list never redraws or jumps
     const on=ui.sel.has(id),mk=row&&row.querySelector(".selc"),bar=$("#app .selbar");
     if(!mk||!bar){render();return}
@@ -1977,7 +2090,10 @@ const actions={
   "close-week"(){closeWeekModal()},
   settings(){settingsModal()},
   "close-modal"(){closeModal()},
-  "open-hist"(id){ui.hist=id;ui.top=true;render()},
+  "open-hist"(id){ui.vw=id;ui.hist=null;ui.sel=null;ui.tab="summary";ui.top=true;render()},
+  "week-pick"(){weekPicker()},
+  "week-go"(id,b){closeModal();ui.vw=id||null;ui.sel=null;if(b&&b.dataset.tab)ui.tab=b.dataset.tab;ui.top=true;render()},
+  "week-step"(id){const L=weekList(),i=L.indexOf(VW()),j=Math.max(0,Math.min(L.length-1,i+(+id)));ui.vw=j===0?null:L[j].id;ui.sel=null;ui.top=true;render()},
   "del-hist"(id){deleteWeekModal(id)},
   "week-menu"(id){weekMenu(id)},
   "rename-week"(id){renameWeekModal(id)},
@@ -1988,7 +2104,8 @@ const actions={
   "act-scope"(id){ui.actScope=id;ui.top=true;render()},
   backup(){backup()},
   "change-pw"(){passwordModal()},
-  async "sign-out"(){closeModal();ui.denied="";try{await sb.auth.signOut()}catch(e){}teardown();render()},
+  async "sign-out"(){closeModal();ui.denied="";disableFaceId();try{await sb.auth.signOut()}catch(e){}teardown();render()},
+  async "faceid-toggle"(){if(lockInfo()){disableFaceId();toast("Face ID is off for this phone");closeModal();settingsModal()}else if(await faceIdAvailable()){if(await enrollFaceId()){closeModal();settingsModal()}}else toast("Face ID is not available on this device")},
   async forgot(){
     const f=$("#lf"),email=f&&f.email.value.trim();
     if(!email){toast("Type your email first, then tap Forgot password");return}
@@ -2007,7 +2124,7 @@ document.addEventListener("pointermove",e=>{if(lp&&Math.hypot(e.clientX-lp.x,e.c
 ["pointerup","pointercancel","scroll"].forEach(n=>document.addEventListener(n,()=>{if(lp){clearTimeout(lp.t);lp=null}},true));
 document.addEventListener("contextmenu",e=>{if(e.target.closest(".row"))e.preventDefault()});
 function startQuickSelect(id){
-  const c=state&&state.week.cards.find(x=>x.id===id);if(!c)return;
+  const c=state&&VW().cards.find(x=>x.id===id);if(!c)return;
   ui.sel=new Set([id]);lpSuppress=true;setTimeout(()=>{lpSuppress=false},900);
   try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}
   render();
@@ -2055,6 +2172,45 @@ window.addEventListener("scroll",()=>{if(document.body.classList.contains("shell
 window.addEventListener("orientationchange",()=>{setTimeout(fitShell,250);setTimeout(fitShell,700)});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)fitShell()});
 
+// ---------- Face ID lock ----------
+// a passkey on this phone gates opening the app; the Supabase session itself stays saved on the phone
+const LOCK_KEY="repack-lock",EMAIL_KEY="repack-email",EPHEMERAL_KEY="repack-ephemeral";
+const b64u={enc:b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""),dec:t=>Uint8Array.from(atob(t.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0))};
+const lockInfo=()=>{try{return JSON.parse(localStorage.getItem(LOCK_KEY)||"null")}catch(e){return null}};
+async function faceIdAvailable(){try{return !!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())}catch(e){return false}}
+async function enrollFaceId(){
+  try{
+    const cred=await navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:"Repack Ledger",id:location.hostname},
+      user:{id:crypto.getRandomValues(new Uint8Array(16)),name:me.email,displayName:me.name},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"preferred"},timeout:60000}});
+    if(!cred)return false;
+    localStorage.setItem(LOCK_KEY,JSON.stringify({id:b64u.enc(cred.rawId),email:me.email}));toast("Face ID is on for this phone");return true;
+  }catch(e){toast(e&&e.name==="NotAllowedError"?"Face ID was cancelled":"Face ID could not be turned on");return false}
+}
+function disableFaceId(){localStorage.removeItem(LOCK_KEY)}
+async function verifyFaceId(){
+  const L=lockInfo();if(!L)return true;
+  try{const a=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:location.hostname,allowCredentials:[{type:"public-key",id:b64u.dec(L.id)}],userVerification:"required",timeout:60000}});return !!a}catch(e){return false}
+}
+let locked=false,lockFails=0,hiddenAt=0;
+function showLock(){
+  locked=true;let el=$("#lockscr");
+  if(!el){el=document.createElement("div");el.id="lockscr";document.body.appendChild(el)}
+  el.innerHTML='<div class="lockin"><img src="icon-192.png" alt=""><h1>Repack Ledger</h1><p class="hint">Locked</p><button class="btn block" id="lkgo">'+ic("lock",18)+'Unlock with Face ID</button>'+(lockFails>=3?'<button class="btn sec block" id="lkpw" style="margin-top:8px">Sign in with password</button>':"")+"</div>";
+  $("#lkgo").addEventListener("click",tryUnlock);
+  const pw=$("#lkpw");if(pw)pw.addEventListener("click",async()=>{disableFaceId();hideLock();try{await sb.auth.signOut()}catch(e){}teardown();render()});
+}
+function hideLock(){locked=false;lockFails=0;const el=$("#lockscr");if(el)el.remove()}
+async function tryUnlock(){
+  if(await verifyFaceId()){hideLock();return}
+  lockFails++;showLock();if(lockFails<3)toast("Face ID did not match. Try again.");
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){hiddenAt=Date.now();return}
+  // lock again after 5 minutes away
+  if(me&&lockInfo()&&!locked&&hiddenAt&&Date.now()-hiddenAt>300000){showLock();tryUnlock()}
+});
+
 // ---------- boot ----------
 async function boot(){
   const c=cfg();
@@ -2067,6 +2223,9 @@ async function boot(){
   let session=null;
   try{const r=await sb.auth.getSession();session=r.data&&r.data.session}catch(e){}
   if(ui.recovery){render();return}
+  // "Stay signed in" off: a fresh launch of the app signs out
+  if(session&&localStorage.getItem(EPHEMERAL_KEY)==="1"&&!sessionStorage.getItem("repack-alive")){try{await sb.auth.signOut()}catch(e){}session=null}
+  if(session&&lockInfo()){showLock();tryUnlock()}
   if(session)await enter(session);else render();
 }
 boot();
