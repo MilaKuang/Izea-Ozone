@@ -368,6 +368,34 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 #splash img{width:84px;height:84px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.18);animation:splashIn .34s cubic-bezier(.2,.9,.3,1.2) both}
 @keyframes splashIn{from{transform:scale(.72);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes splashOut{to{opacity:0;visibility:hidden}}
+/* ---------- polish ---------- */
+.nudge{display:flex;align-items:center;gap:8px;margin:0 16px 10px;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:6px 6px 6px 12px;font-size:13.5px;font-weight:600}
+.nudge span{flex:1;min-width:0}
+.nudge .btn{flex:none;padding:7px 12px;min-height:0}
+.nx{flex:none;width:30px;height:30px;border:0;background:transparent;color:inherit;font-size:20px;line-height:1;border-radius:8px;opacity:.7}
+.hero.compact{padding:12px 14px 10px;margin-bottom:12px}
+.hero.compact .big{font-size:27px}
+.hero.compact small{font-size:12px}
+.hero.compact .hstats{margin-top:10px;padding-top:9px}
+.hero.compact .hstats b{font-size:16px}
+.hero .neg,.hero .big.neg,.hero b.neg{color:#fff}
+.hero .big.neg::after{content:"loss";display:inline-block;vertical-align:middle;margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(255,255,255,.2);border-radius:99px;padding:3px 8px}
+.quick.inline{gap:6px;margin-bottom:12px}
+.quick.inline .qbtn{flex-direction:row;gap:6px;padding:8px 6px;border-radius:12px;font-size:12.5px}
+.prow .btn{min-height:44px}
+.minis select,.minis .mini{min-height:38px;padding-top:7px;padding-bottom:7px;font-size:14px}
+.pcard .lbl{text-transform:none;letter-spacing:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ifall{flex-wrap:wrap;row-gap:2px}
+.ifall span{white-space:nowrap;font-size:11.5px}
+.ifall b{font-size:14px;margin-left:auto}
+.big,.amt b,.tile b,.pbrk span,.xrow b{font-variant-numeric:tabular-nums}
+.row .pills:empty{display:none}
+.sech h3{letter-spacing:.06em}
+.skel{padding:calc(70px + env(safe-area-inset-top)) 16px 0}
+.sk{border-radius:14px;background:linear-gradient(90deg,var(--line) 0%,var(--card) 50%,var(--line) 100%);background-size:200% 100%;animation:skel 1.1s linear infinite;margin-bottom:10px}
+.sk.h{height:44px}.sk.b{height:120px;border-radius:18px}.sk.r{height:68px}
+@keyframes skel{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -505,7 +533,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=36;
+const APP_VERSION=37;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -795,14 +823,16 @@ function dueBanner(){
   const d=new Date();d.setHours(0,0,0,0);
   d.setDate(d.getDate()-((d.getDay()-state.settings.resetDay+7)%7));
   if(parseISO(w.start)>=d)return "";
-  return '<div class="banner"><span>A new week has started. Close out the last one and reset?</span><button class="btn sm" data-act="close-week">Close week</button></div>';
+  if(!["cards","summary"].includes(ui.tab))return "";
+  try{if(sessionStorage.getItem("repack-nudge")===w.id+todayISO())return ""}catch(e){}
+  return '<div class="nudge">'+ic("history",16)+'<span>New week started</span><button class="btn sm" data-act="close-week">Close week</button><button class="nx" data-act="nudge-off" aria-label="Hide for today">&times;</button></div>';
 }
 function render(){
   document.documentElement.classList.remove("shell");document.body.classList.remove("shell");$("#app").classList.remove("shell");
   if(!cfg()||!sb){renderSetup();return}
   if(ui.recovery){renderNewPassword();return}
   if(!me){renderLogin();return}
-  if(!state){$("#app").innerHTML='<div class="welcome"><p class="hint">Loading...</p></div>';return}
+  if(!state){$("#app").innerHTML='<div class="skel" aria-label="Loading"><div class="sk h"></div><div class="sk b"></div><div class="sk r"></div><div class="sk r"></div><div class="sk r"></div><p class="hint" style="text-align:center">Loading...</p></div>';return}
   const prev=$("#scroller"),key=ui.hist?"h:"+ui.hist:ui.tab+(ui.vw?":"+ui.vw:"");
   // remember where each screen was scrolled to; iPhones can drop a single scrollTop set after a redraw
   if(!ui.pos)ui.pos={};
@@ -835,7 +865,7 @@ function cardRowHTML(c,edit,view){
   const pre=edit==="sel"?'<span class="selc'+(picked?" on":"")+'">'+(picked?ic("check",15):"")+"</span>":"";
   const first=n?attachList(c.id)[0]:null;
   const th='<div class="thumbsm '+(first?"":oc)+'">'+(first?'<img data-path="'+esc(first.path)+'" alt="">':ic("cards",20))+"</div>";
-  const pills='<span class="badge '+oc+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Still selling</span>':"")+(+c.carryCost?'<span class="badge ok">From last week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+costPill;
+  const pills=(c.owner&&c.owner!=="Shared"?'<span class="badge '+oc+'">'+esc(c.owner)+"</span>":"")+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):"")+(!c.sold&&c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":"")+(c.fromCardId?'<span class="badge ok">Trade-in</span>':"")+(!c.sold&&c.carried?'<span class="badge rp-pending">Still selling</span>':"")+(+c.carryCost?'<span class="badge ok">From last week</span>':"")+(need&&!c.sold?'<span class="badge">Needs details</span>':"")+(!c.sold&&c.repack!=="accepted"&&dn!=null&&dn>0?'<span class="badge age'+(dn>=14?" old":"")+'">'+dn+"d in stock</span>":"")+(n?'<span class="badge ok">'+n+(n>1?" photos":" photo")+"</span>":"")+costPill;
   return '<div class="row'+(act?"":" static")+(picked?" picked":"")+'" '+(act?'data-act="'+act+'" data-id="'+c.id+'"':"")+">"+pre+th+'<div class="main"><div class="desc">'+esc(c.desc||"(no description yet)")+'</div><div class="sub one">Cert '+esc(c.cert||"n/a")+" | "+fmtDate(c.date)+(c.updatedBy?" | "+esc(c.updatedBy):"")+'</div><div class="pills">'+pills+'</div></div><div class="amt"><b>'+right+"</b><small>"+sub2+"</small></div></div>";
 }
 function statusOk(c,f){return f==="stock"?(!c.sold&&c.repack!=="accepted"&&c.repack!=="pending"):f==="pending"?(!c.sold&&c.repack==="pending"):f==="accepted"?(!c.sold&&c.repack==="accepted"):f==="sold"?c.sold:f==="need"?(!c.sold&&!(c.desc&&+c.mv)):true}
@@ -870,7 +900,7 @@ function soldHero(cs){
   const cost=round2(sum(withCost,c=>lc.get(c.id))),profit=round2(sum(withCost,val)-cost);
   const so=sold.filter(c=>c.saleType!=="traded"&&+c.mv>0&&c.soldPrice!==""&&c.soldPrice!=null),smv=sum(so,c=>c.mv),avg=smv>0?sum(so,val)/smv*100:null;
   const top='<span>Total sales</span><b class="big">'+money(sales)+"</b>";
-  return '<div class="hero">'+top+'<div class="hstats h4"><div><span>Sold</span><b>'+sold.length+'</b></div><div><span>Avg % mkt</span><b>'+(avg==null?"n/a":avg.toFixed(1)+"%")+"</b></div></div></div>";
+  return '<div class="hero compact">'+top+'<div class="hstats h4"><div><span>Sold</span><b>'+sold.length+'</b></div><div><span>Avg % mkt</span><b>'+(avg==null?"n/a":avg.toFixed(1)+"%")+"</b></div></div></div>";
 }
 function earlierSection(){
   const f=ui.filter||"all";if(f==="sold")return "";
@@ -882,9 +912,9 @@ function cardsView(){
   const t=calc(VW()),P=state.settings.partners,cs=VW().cards.filter(c=>!ui.owner||c.owner===ui.owner);
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
-  return (ui.filter==="sold"?soldHero(cs):'<div class="hero">'+(ui.filter==="all"||!ui.filter?'<span>'+(isPast()?"Total market that week":"Total market this week")+'</span><b class="big">'+money(round2(sum(cs,c=>c.mv)))+'</b><small>Unsold market value '+money(t.mv)+" | Payout due "+money(t.due)+"</small>":filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
+  return (ui.filter==="sold"?soldHero(cs):'<div class="hero compact">'+(ui.filter==="all"||!ui.filter?'<span>'+(isPast()?"Total market that week":"Total market this week")+'</span><b class="big">'+money(round2(sum(cs,c=>c.mv)))+'</b><small>Unsold market value '+money(t.mv)+" | Payout due "+money(t.due)+"</small>":filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
-  (isPast()?'<div class="quick"><button class="qbtn" data-act="sel-mode">'+ic("tag")+"Edit many</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>"))+
+  (isPast()?'<div class="quick"><button class="qbtn" data-act="sel-mode">'+ic("tag")+"Edit many</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>").replace('<div class="quick">','<div class="quick inline">'))+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
   '<div class="minis"><select class="mini" id="sortsel" aria-label="Sort">'+opt("new","Newest first",ui.sort)+opt("value","Highest value",ui.sort)+opt("low","Lowest value",ui.sort)+opt("name","Name A-Z",ui.sort)+opt("age","Longest in stock",ui.sort)+'</select><select class="mini" id="ownersel" aria-label="Owner">'+opt("","All owners",ui.owner)+opt(P[0],P[0],ui.owner)+opt(P[1],P[1],ui.owner)+opt("Shared","Shared",ui.owner)+"</select></div>"+
@@ -2092,6 +2122,7 @@ const actions={
   "close-modal"(){closeModal()},
   "open-hist"(id){ui.vw=id;ui.hist=null;ui.sel=null;ui.tab="summary";ui.top=true;render()},
   "week-pick"(){weekPicker()},
+  "nudge-off"(){try{sessionStorage.setItem("repack-nudge",state.week.id+todayISO())}catch(e){}render()},
   "week-go"(id,b){closeModal();ui.vw=id||null;ui.sel=null;if(b&&b.dataset.tab)ui.tab=b.dataset.tab;ui.top=true;render()},
   "week-step"(id){const L=weekList(),i=L.indexOf(VW()),j=Math.max(0,Math.min(L.length-1,i+(+id)));ui.vw=j===0?null:L[j].id;ui.sel=null;ui.top=true;render()},
   "del-hist"(id){deleteWeekModal(id)},
