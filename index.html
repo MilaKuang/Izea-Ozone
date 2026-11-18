@@ -545,35 +545,55 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=42;
+const APP_VERSION=43;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
+  // a removed channel still reports "closed" a moment later; only the current channel may change the status
   if(!rt){
-    rt=sb.channel("repack-live")
-      .on("postgres_changes",{event:"*",schema:"public"},()=>{clearTimeout(rtT);rtT=setTimeout(softRefresh,400)})
-      .subscribe((st,err)=>{rtStatus=st;rtErr=err?String(err.message||err):"";if(st==="CHANNEL_ERROR"||st==="TIMED_OUT")retryLive()});
+    const ch=sb.channel("repack-live");rt=ch;
+    ch.on("postgres_changes",{event:"*",schema:"public"},()=>{clearTimeout(rtT);rtT=setTimeout(softRefresh,400)})
+      .subscribe((st,err)=>{if(rt!==ch)return;rtStatus=st;rtErr=err?String(err.message||err):"";if(st!=="SUBSCRIBED")retryLive()});
   }
   if(!pc){
-    pc=sb.channel("repack-presence",{config:{presence:{key:me.name}}})
-      .on("presence",{event:"sync"},()=>{try{online=pc.presenceState()||{}}catch(e){online={}}paintPresence()})
-      .subscribe((st,err)=>{pcStatus=st;pcErr=err?String(err.message||err):"";if(st==="SUBSCRIBED")trackMe(true);else if(st==="CHANNEL_ERROR"||st==="TIMED_OUT")retryLive()});
+    const ch=sb.channel("repack-presence",{config:{presence:{key:me.name}}});pc=ch;
+    ch.on("presence",{event:"sync"},()=>{if(pc!==ch)return;try{online=pc.presenceState()||{}}catch(e){online={}}paintPresence()})
+      .subscribe((st,err)=>{if(pc!==ch)return;pcStatus=st;pcErr=err?String(err.message||err):"";if(st==="SUBSCRIBED")trackMe(true);else retryLive()});
   }
 }
-function retryLive(){
+// a dropped channel (closed, error or timed out) is rebuilt after a short wait, then again with longer waits until it holds
+let retryN=0,stopping=false;
+function retryLive(now){
+  if(stopping||!me||!sb)return;
   clearTimeout(retryT);
-  retryT=setTimeout(()=>{if(!me||!sb)return;
+  retryT=setTimeout(()=>{if(stopping||!me||!sb||document.hidden)return;
+    if(rtStatus==="SUBSCRIBED"&&pcStatus==="SUBSCRIBED"){retryN=0;return}
+    retryN++;
     if(rt&&rtStatus!=="SUBSCRIBED"){try{sb.removeChannel(rt)}catch(e){}rt=null}
     if(pc&&pcStatus!=="SUBSCRIBED"){try{sb.removeChannel(pc)}catch(e){}pc=null;online={};lastTrack=""}
     subscribe();
-  },5000);
+  },now?0:Math.min(30000,2000*Math.pow(2,Math.min(retryN,4))));
 }
+// phones freeze the app in the background and the live connection dies with it, sometimes still reporting "subscribed".
+// Coming back after more than 20 seconds always rebuilds it from scratch with a fresh sign-in token.
+async function reconnectLive(){
+  if(!sb||!me)return;
+  stopping=true;clearTimeout(retryT);
+  try{if(rt)await sb.removeChannel(rt)}catch(e){}
+  try{if(pc)await sb.removeChannel(pc)}catch(e){}
+  rt=null;pc=null;online={};lastTrack="";rtStatus=pcStatus="";retryN=0;
+  try{const r=await sb.auth.getSession();const tok=r.data&&r.data.session&&r.data.session.access_token;if(tok)sb.realtime.setAuth(tok)}catch(e){}
+  stopping=false;subscribe();
+}
+// while the app is open, check every 20 seconds that both channels are still up
+setInterval(()=>{if(sb&&me&&!document.hidden&&(rtStatus!=="SUBSCRIBED"||pcStatus!=="SUBSCRIBED"))retryLive(true)},20000);
 function liveText(){
   if(rtStatus==="SUBSCRIBED"&&pcStatus==="SUBSCRIBED")return "Connected";
   const bad=[rtStatus&&rtStatus!=="SUBSCRIBED"?"data "+rtStatus.toLowerCase().replace("_"," ")+(rtErr?" ("+rtErr+")":""):"",pcStatus&&pcStatus!=="SUBSCRIBED"?"online list "+pcStatus.toLowerCase().replace("_"," ")+(pcErr?" ("+pcErr+")":""):""].filter(Boolean);
   return bad.length?"Not connected: "+bad.join(", "):"Connecting...";
 }
 function teardown(){
+  stopping=true;setTimeout(()=>{stopping=false},0);
   clearTimeout(rtT);
   clearTimeout(retryT);
   if(rt&&sb){try{sb.removeChannel(rt)}catch(e){}}
@@ -2301,8 +2321,9 @@ document.addEventListener("click",e=>{if(lpSuppress&&e.target.closest("[data-act
 document.addEventListener("input",e=>{if(e.target.id==="q"){ui.q=e.target.value;paintList()}});
 document.addEventListener("change",e=>{const id=e.target.id;if(id==="sortsel"){ui.sort=e.target.value;try{localStorage.setItem("repack-ui",JSON.stringify({sort:ui.sort}))}catch(x){}render()}else if(id==="ownersel"){ui.owner=e.target.value;render()}});
 $("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const mode=ui.importMode;const r=new FileReader();r.onload=()=>mode==="triumph"?importTriumphStatus(String(r.result)):importCSVText(String(r.result));r.readAsText(f)});
-document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document.hidden){try{pc&&pc.untrack()}catch(e){}lastTrack=""}else{softRefresh();if(pcStatus!=="SUBSCRIBED"||rtStatus!=="SUBSCRIBED")retryLive();trackMe(true)}});
-window.addEventListener("online",()=>{if(sb&&me)softRefresh()});
+let awayAt=0;
+document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document.hidden){awayAt=Date.now();try{pc&&pc.untrack()}catch(e){}lastTrack=""}else{softRefresh();if(awayAt&&Date.now()-awayAt>20000)reconnectLive();else if(pcStatus!=="SUBSCRIBED"||rtStatus!=="SUBSCRIBED")retryLive(true);trackMe(true)}});
+window.addEventListener("online",()=>{if(sb&&me){softRefresh();reconnectLive()}});
 
 // ---------- full-screen height (iPhone home screen apps report a short height) ----------
 // when the iPhone keyboard is up, fit open forms into the visible area and keep the box being typed in on screen
@@ -2387,6 +2408,8 @@ async function boot(){
   sb.auth.onAuthStateChange(ev=>{
     if(ev==="PASSWORD_RECOVERY"){ui.recovery=true;setTimeout(render,0)}
     if(ev==="SIGNED_OUT"&&me){teardown();setTimeout(render,0)}
+    // keep the live connection on the newest sign-in token so it is not dropped when the old one expires
+    if(ev==="TOKEN_REFRESHED"&&me&&(rtStatus!=="SUBSCRIBED"||pcStatus!=="SUBSCRIBED"))retryLive(true);
   });
   let session=null;
   try{const r=await sb.auth.getSession();session=r.data&&r.data.session}catch(e){}
