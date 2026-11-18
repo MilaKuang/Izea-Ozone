@@ -96,6 +96,11 @@ select.mini{padding:8px 10px;font-size:14px;border-radius:10px;background:var(--
 .badge.flag{background:#fee2e2;color:#b91c1c}
 @media(prefers-color-scheme:dark){.badge.flag{background:#4c1d1d;color:#fca5a5}}
 .qbox{border:1.5px solid var(--warn-ink)}
+.cfbox{display:flex;justify-content:space-between;align-items:center;width:100%;border:1.5px solid var(--neg);background:var(--card);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.cfbox span{color:var(--neg);font-size:13px;font-weight:600}
+.cfrow{border-top:1px solid var(--line);padding:10px 0}
+.cfrow p{margin:4px 0 8px;font-size:14px;line-height:1.4}
+.cfact{display:flex;gap:8px}.cfact .btn{flex:1}
 .qlist{max-height:180px;overflow-y:auto;margin:6px 0 10px}
 .qrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px;font-weight:600}
 .qrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -394,7 +399,7 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .hero.compact small{font-size:12px}
 .hero.compact .hstats{margin-top:10px;padding-top:9px}
 .hero.compact .hstats b{font-size:16px}
-.quick.inline{gap:6px;margin-bottom:12px}
+.quick.inline{gap:6px;margin-bottom:12px;grid-template-columns:repeat(2,1fr)}
 .quick.inline .qbtn{flex-direction:row;gap:6px;padding:8px 6px;border-radius:12px;font-size:12.5px}
 .prow .btn{min-height:44px}
 .minis select,.minis .mini{min-height:38px;padding-top:7px;padding-bottom:7px;font-size:14px}
@@ -458,7 +463,7 @@ img.freeze{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;dis
 <script>
 "use strict";
 const DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-const CFG_KEY="repack-cfg",CACHE_KEY="repack-cache-v1";
+const CFG_KEY="repack-cfg",CACHE_KEY="repack-cache-v2";
 
 const $=(s,e=document)=>e.querySelector(s);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -503,8 +508,11 @@ async function fetchAll(table,order){
   }
   return out;
 }
-async function loadAll(){
-  const [st,wk,cd,sp,po,at,au,mb,rp,rq,lq,kq]=await Promise.all([
+// the last copy from the server, kept on the phone so the app can rebuild everything with no signal
+let RAW=null,VIEW=null;
+const withTO=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error("Failed to fetch (timed out)")),ms||12000))]);
+async function fetchRaw(){
+  const [st,wk,cd,sp,po,at,au,mb,rp,rq,lq,kq]=await withTO(Promise.all([
     sb.from("settings").select("*").eq("id",1).single(),
     sb.from("weeks").select("*").order("start_date",{ascending:true}),
     fetchAll("cards"),fetchAll("spend"),fetchAll("payouts"),fetchAll("attachments","created_at"),
@@ -514,19 +522,34 @@ async function loadAll(){
     sb.from("cards").select("repacker").limit(1),
     sb.from("spend").select("kind").limit(1),
     sb.from("cards").select("carried").limit(1)
-  ]);
+  ]),20000);
   for(const r of [st,wk,au])if(r.error)throw r.error;
+  return{st:st.data,wk:wk.data,cd,sp,po,at,au:au.data,mb:(mb&&!mb.error&&mb.data)||[],f:{carried:!!(kq&&!kq.error),loan:!!(lq&&!lq.error),repack:!!(rp&&!rp.error),repacker:!!(rq&&!rq.error)}};
+}
+function buildState(raw){
   const by=(rows,map)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.week_id))m.set(r.week_id,[]);m.get(r.week_id).push(map(r))});return m};
-  const cm=by(cd,mapCard),sm=by(sp,mapEntry),pm=by(po,mapEntry);
+  const cm=by(raw.cd,mapCard),sm=by(raw.sp,mapEntry),pm=by(raw.po,mapEntry);
   const mk=w=>({id:w.id,label:w.label,start:w.start_date,end:w.end_date,cards:cm.get(w.id)||[],spend:sm.get(w.id)||[],payouts:pm.get(w.id)||[]});
-  const open=wk.data.find(w=>!w.closed);
+  const open=raw.wk.find(w=>!w.closed);
   if(!open)throw new Error("No open week found. Re-run setup.sql.");
-  const history=wk.data.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
-  const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
-  state={hasCarried:!!(kq&&!kq.error),hasCost:false,hasLoan:!!(lq&&!lq.error),hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
-  ui.offline=false;
-  try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state:Object.assign({},state,{attach:[...state.attach]})}))}catch(e){}
-  setTimeout(()=>flushQueue(),0);
+  const history=raw.wk.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
+  const attach=new Map();raw.at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
+  const st=raw.st;
+  return{hasCarried:raw.f.carried,hasCost:false,hasLoan:raw.f.loan,hasRepack:raw.f.repack,hasRepacker:raw.f.repacker,hasRepackerList:!!(st&&"repackers" in st),members:raw.mb,attach,settings:{partners:st.partners,resetDay:st.reset_day,defaultPct:+st.default_pct,repackers:(Array.isArray(st.repackers)&&st.repackers.length?st.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:raw.au};
+}
+// rebuild what the app shows: the server copy with this phone's not-yet-uploaded changes on top
+function rebuild(){VIEW=applyOutbox(RAW);state=buildState(VIEW)}
+function loadCache(email){
+  try{const c=JSON.parse(localStorage.getItem(CACHE_KEY));if(!c||!c.raw||!c.me||(email&&c.me.email!==email))return false;me=c.me;RAW=c.raw;rebuild();ui.offline=true;return true}catch(e){return false}
+}
+async function loadAll(){
+  let raw;
+  try{raw=await fetchRaw()}
+  catch(e){if(isNetErr(e)&&(RAW||loadCache(me&&me.email))){ui.offline=true;rebuild();return}throw e}
+  RAW=raw;const was=ui.offline;ui.offline=false;rebuild();
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,raw:RAW}))}catch(e){}
+  if(was)subscribe();
+  setTimeout(syncAll,0);
 }
 async function refreshRender(){try{await loadAll()}catch(e){toast(errText(e))}render()}
 async function softRefresh(){
@@ -544,9 +567,11 @@ function errText(e){
   return m||"Something went wrong";
 }
 async function api(p){
+  const w=writeInfo(p);
+  if(w){prepWrite(p,w);if(isOffline())return queueWrite(p,w)}
   let r;
-  try{r=await p}catch(e){toast(errText(e));return null}
-  if(r&&r.error){toast(errText(r.error));return null}
+  try{r=await (w?withTO(p):p)}catch(e){if(w&&isNetErr(e))return queueWrite(p,w);toast(errText(e));return null}
+  if(r&&r.error){if(w&&isNetErr(r.error))return queueWrite(p,w);toast(errText(r.error));return null}
   return r||{};
 }
 
@@ -581,16 +606,168 @@ async function flushQueue(quiet){
 }
 // a box at the top of Cards while scans are waiting
 function queueBox(){
-  const l=qList();if(!l.length)return "";
-  return '<div class="cardbox qbox"><div class="owtop"><b>'+plural(l.length,"scan")+' waiting to upload</b><span>'+(isOffline()?"No signal":"Ready")+'</span></div><div class="qlist">'+l.slice().reverse().map(x=>'<div class="qrow"><span>'+esc(x.desc||"Cert "+x.cert)+'<small>'+(x.desc?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+(x.by?" | "+esc(x.by):"")+'</small></span><button class="fs-del" type="button" data-act="q-del" data-id="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",16)+"</button></div>").join("")+'</div><button class="btn sm block" data-act="q-flush" type="button"'+(isOffline()?" disabled":"")+">"+ic("upload",16)+"Upload now</button></div>";
+  const ob=obList(),cf=cfList();
+  const top=(cf.length?'<button class="cardbox cfbox" data-act="conflicts" type="button"><b>'+plural(cf.length,"change")+' need'+(cf.length===1?"s":"")+' a decision</b><span>Tap to review</span></button>':"")+
+    (ob.length?'<div class="cardbox qbox"><div class="owtop"><b>'+plural(ob.length,"change")+' waiting to upload</b><span>'+(isOffline()?"No signal":"Uploading")+'</span></div><p class="hint" style="margin:4px 0 8px">Saved on this phone. They upload by themselves when signal is back. Edits someone else made in the meantime are never overwritten.</p><button class="btn sm block" data-act="q-flush" type="button"'+(navigator.onLine===false?" disabled":"")+">"+ic("upload",16)+"Upload now</button></div>":"");
+  const l=qList();if(!l.length)return top;
+  return '<div class="cardbox qbox"><div class="owtop"><b>'+plural(l.length,"scan")+' waiting to upload</b><span>'+(isOffline()?"No signal":"Ready")+'</span></div><div class="qlist">'+l.slice().reverse().map(x=>'<div class="qrow"><span>'+esc(x.desc||"Cert "+x.cert)+'<small>'+(x.desc?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+(x.by?" | "+esc(x.by):"")+'</small></span><button class="fs-del" type="button" data-act="q-del" data-id="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",16)+"</button></div>").join("")+'</div><button class="btn sm block" data-act="q-flush" type="button"'+(isOffline()?" disabled":"")+">"+ic("upload",16)+"Upload now</button></div>"+top;
 }
 function paintQueue(){const b=$("#qbox");if(b)b.innerHTML=queueBox()}
-window.addEventListener("online",()=>{setTimeout(async()=>{if(!sb)return;if(ui.offline){try{const r=await sb.auth.getSession();if(r.data&&r.data.session)await enter(r.data.session)}catch(e){}}else flushQueue()},1500)});
-window.addEventListener("offline",paintQueue);
-setInterval(()=>{if(qList().length&&!document.hidden)flushQueue(true)},30000);
+window.addEventListener("online",()=>{setTimeout(tryOnline,1500)});
+window.addEventListener("offline",()=>{paintQueue()});
+setInterval(()=>{if(document.hidden||!sb||!me)return;if(ui.offline)tryOnline();else if(obList().length||qList().length)syncAll()},15000);
+// with no signal the app keeps working from the saved copy; this checks for signal and catches up
+let tryingOnline=false;
+async function tryOnline(){
+  if(tryingOnline||!sb||navigator.onLine===false)return;tryingOnline=true;
+  try{
+    if(ui.noSession){const r=await sb.auth.getSession();const ses=r.data&&r.data.session;ui.noSession=false;if(ses)await enter(ses);else{me=null;state=null;render()}return}
+    if(!me)return;
+    await loadAll();
+    if(!ui.offline){if(document.querySelector(".overlay"))ui.dirty=true;else render()}
+  }catch(e){}finally{tryingOnline=false}
+}
+
+// ---------- offline edits ----------
+// with no signal, every change to cards, buys and payouts is saved on this phone and shown right away.
+// When signal is back each change is uploaded field by field: a field someone else changed in the meantime is never
+// overwritten. It is listed under "Needs a decision" so you can keep theirs or use yours.
+const OB_KEY="repack-outbox",CF_KEY="repack-conflicts",OB_TABLES={cards:"cd",spend:"sp",payouts:"po"};
+const obList=()=>{try{const l=JSON.parse(localStorage.getItem(OB_KEY)||"[]");return Array.isArray(l)?l.filter(o=>!me||!o.email||o.email===me.email):[]}catch(e){return []}};
+const obSave=l=>{try{localStorage.setItem(OB_KEY,JSON.stringify(l))}catch(e){toast("This phone is out of storage for offline changes")}};
+const cfList=()=>{try{const l=JSON.parse(localStorage.getItem(CF_KEY)||"[]");return Array.isArray(l)?l:[]}catch(e){return []}};
+const cfSave=l=>{try{localStorage.setItem(CF_KEY,JSON.stringify(l))}catch(e){}};
+const uuid=()=>(crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==="x"?r:(r&3|8)).toString(16)}));
+function idsOf(params){
+  const v=params.id;if(!v)return null;
+  if(v.startsWith("eq."))return [v.slice(3)];
+  const m=v.match(/^in\.\((.*)\)$/);return m?m[1].split(",").map(x=>x.replace(/^"|"$/g,"")):null;
+}
+// which saves can wait for signal: inserts, and edits or deletes of specific rows, in cards, spend and payouts
+function writeInfo(p){
+  if(!p||!p.url||!p.method||!/^(POST|PATCH|DELETE)$/.test(p.method))return null;
+  const t=String(p.url.pathname||"").split("/").pop();if(!OB_TABLES[t])return null;
+  const params=Object.fromEntries(p.url.searchParams);
+  if(p.method!=="POST"){const ids=idsOf(params);if(!ids||!ids.length)return null;return{t,m:p.method,params,ids}}
+  return{t,m:"POST",params};
+}
+// new rows get their id on the phone, so a save that is retried never makes a second copy
+function prepWrite(p,w){
+  if(w.m!=="POST")return;
+  const rows=Array.isArray(p.body)?p.body:[p.body];rows.forEach(r=>{if(r&&!r.id)r.id=uuid()});
+  if(p.url.searchParams.has("columns")&&!/"id"/.test(p.url.searchParams.get("columns")))p.url.searchParams.set("columns",p.url.searchParams.get("columns")+',"id"');
+}
+let obToastT=0;
+function queueWrite(p,w){
+  if(!RAW){toast("No connection. Try again when you are online.");return null}
+  const body=p.body,op={id:uuid(),t:w.t,m:w.m,params:w.params,prefer:(p.headers&&p.headers.get("Prefer"))||"",body,at:new Date().toISOString(),by:me&&me.name||"",email:me&&me.email||""};
+  if(w.m!=="POST"){
+    // what this phone saw before the change, to tell later whether someone else changed the same thing
+    const rows=(VIEW||RAW)[OB_TABLES[w.t]];op.ids=w.ids;op.base={};op.baseAt={};
+    w.ids.forEach(id=>{const r=rows.find(x=>x.id===id);if(!r)return;op.baseAt[id]=r.updated_at||"";if(body)op.base[id]=Object.fromEntries(Object.keys(body).map(k=>[k,r[k]===undefined?null:r[k]]))});
+  }
+  const l=obList();l.push(op);obSave(l);
+  ui.offline=true;rebuild();ui.dirty=true;paintQueue();
+  if(Date.now()-obToastT>8000){obToastT=Date.now();toast("No signal. Saved on this phone, it uploads when you are back online.")}
+  const single=/object/.test((p.headers&&p.headers.get("Accept"))||"");
+  const ids=w.m==="POST"?(Array.isArray(body)?body:[body]).map(r=>({id:r.id})):null;
+  return{data:ids?(single?ids[0]:ids):null,error:null,queued:true};
+}
+function applyOutbox(raw){
+  if(!raw)return raw;
+  const v=Object.assign({},raw,{cd:raw.cd.map(r=>Object.assign({},r)),sp:raw.sp.map(r=>Object.assign({},r)),po:raw.po.map(r=>Object.assign({},r))});
+  obList().forEach(op=>{
+    const rows=v[OB_TABLES[op.t]];if(!rows)return;const stamp={updated_by:op.by,updated_at:op.at};
+    if(op.m==="POST"){(Array.isArray(op.body)?op.body:[op.body]).forEach(r=>{if(!r||rows.some(x=>x.id===r.id))return;if(op.t==="cards"&&r.cert&&rows.some(x=>x.week_id===r.week_id&&x.cert===r.cert))return;rows.push(Object.assign({description:"",owner:"Shared",consignor_pct:90,sold:false,notes:"",created_by:op.by,created_at:op.at},r,stamp))})}
+    else if(op.m==="PATCH")rows.forEach(r=>{if(op.ids.includes(r.id))Object.assign(r,op.body,stamp)});
+    else if(op.m==="DELETE")for(let i=rows.length-1;i>=0;i--)if(op.ids.includes(rows[i].id))rows.splice(i,1);
+  });
+  return v;
+}
+const same=(a,b)=>{const n=x=>x===undefined||x===""?null:x;a=n(a);b=n(b);if(a===null||b===null)return a===b;if(typeof a==="boolean"||typeof b==="boolean")return !!a===!!b;if(!isNaN(+a)&&!isNaN(+b)&&String(a).trim()!==""&&String(b).trim()!=="")return Math.abs(+a-+b)<0.005;return String(a)===String(b)};
+const rowName=(t,r)=>t==="cards"?((r.description||"Cert "+(r.cert||"?"))):((t==="spend"?"Buy":"Payout")+" | "+(r.partner||"")+" | "+money(+r.amount||0));
+let syncing=false;
+async function syncOutbox(){
+  const ob=obList();if(!ob.length||syncing)return 0;
+  syncing=true;let done=0;const cf=cfList();
+  try{
+    for(const op of ob){
+      const res=await replayOp(op,cf);
+      if(res==="net")break;
+      obSave(obList().filter(o=>o.id!==op.id));done++;
+    }
+  }catch(e){}finally{syncing=false;cfSave(cf)}
+  return done;
+}
+async function replayOp(op,cf){
+  const T=op.t,net=r=>r&&r.error&&isNetErr(r.error);
+  try{
+    if(op.m==="POST"){
+      const q=/resolution=/.test(op.prefer)?sb.from(T).upsert(op.body,{onConflict:op.params.on_conflict,ignoreDuplicates:/ignore-duplicates/.test(op.prefer)}):sb.from(T).insert(op.body);
+      const r=await withTO(q);if(net(r))return "net";
+      if(r.error){
+        const one=Array.isArray(op.body)?(op.body.length===1?op.body[0]:null):op.body;
+        if(r.error.code==="23505"&&one){const h=await withTO(sb.from(T).select("id").eq("id",one.id));if(net(h))return "net";if(!(h.data||[]).length)cf.push({kind:"note",text:(T==="cards"?"Cert "+(one.cert||"?")+" was already added by someone else, so your offline copy was skipped.":rowName(T,one)+" was already there, so your offline copy was skipped.")})}
+        else if(r.error.code!=="23505")cf.push({kind:"note",text:"Could not upload "+rowName(T,one||{})+": "+errText(r.error)});
+      }
+      return "ok";
+    }
+    const r=await withTO(sb.from(T).select("*").in("id",op.ids));if(net(r))return "net";if(r.error){cf.push({kind:"note",text:"Could not upload a change: "+errText(r.error)});return "ok"}
+    for(const id of op.ids){
+      const srv=(r.data||[]).find(x=>x.id===id),label=srv?rowName(T,srv):"";
+      if(op.m==="DELETE"){
+        if(!srv)continue;
+        // someone edited it after this phone last saw it: ask before deleting
+        if(op.baseAt[id]&&srv.updated_at&&srv.updated_at>op.baseAt[id]&&srv.updated_by!==op.by){cf.push({kind:"del",t:T,id,label,by:srv.updated_by||"someone",at:srv.updated_at});continue}
+        const d=await withTO(sb.from(T).delete().eq("id",id));if(net(d))return "net";continue;
+      }
+      if(!srv){cf.push({kind:"note",text:"Your offline change to "+(op.base&&op.base[id]&&op.base[id].description||"an item")+" was skipped because someone deleted it."});continue}
+      const apply={};
+      Object.keys(op.body||{}).forEach(k=>{
+        const mine=op.body[k],theirs=srv[k],base=op.base&&op.base[id]?op.base[id][k]:undefined;
+        if(same(theirs,mine))return;
+        if(base===undefined||same(theirs,base)){apply[k]=mine;return}
+        cf.push({kind:"field",t:T,id,label,field:k,mine,theirs,by:srv.updated_by||"someone"});
+      });
+      if(Object.keys(apply).length){const u=await withTO(sb.from(T).update(apply).eq("id",id));if(net(u))return "net"}
+    }
+    return "ok";
+  }catch(e){return isNetErr(e)?"net":"ok"}
+}
+let syncAllBusy=false;
+async function syncAll(){
+  if(syncAllBusy||!sb||!me||!RAW||ui.offline)return;
+  if(!obList().length&&!qList().length)return;
+  syncAllBusy=true;
+  try{
+    const before=cfList().length,n=await syncOutbox();
+    await flushQueue(true);
+    const nc=cfList().length-before;
+    if(n){toast("Uploaded "+plural(n,"offline change")+(nc?" | "+nc+" need"+(nc===1?"s":"")+" a decision":""));try{RAW=await fetchRaw();rebuild();try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,raw:RAW}))}catch(e){}}catch(e){}if(document.querySelector(".overlay"))ui.dirty=true;else render()}
+  }finally{syncAllBusy=false;paintQueue()}
+}
+const fieldName=k=>({market_value:"Market value",consignor_pct:"Consignor %",sold:"Sold",sold_price:"Sale price",sold_date:"Sold date",sale_type:"How it left",trade_cash:"Trade cash",description:"Name",owner:"Owner",notes:"Notes",repack_status:"Repacker status",repacker:"Repacker",amount:"Amount",partner:"Partner",note:"Note",entry_date:"Date",carried:"Still selling"})[k]||COL_NAMES[k]||k;
+const showVal=(k,v)=>v===null||v===undefined||v===""?"blank":typeof v==="boolean"?(v?"Yes":"No"):/value|price|cash|amount/.test(k)?money(+v):String(v);
+function conflictsModal(){
+  const draw=()=>{
+    const l=cfList();
+    if(!l.length){closeModal();toast("All sorted");render();return}
+    el.querySelector("#cflist").innerHTML=l.map((c,i)=>c.kind==="note"?'<div class="cfrow"><p>'+esc(c.text)+'</p><div class="cfact"><button class="btn sm sec" data-cf="ok" data-i="'+i+'">OK</button></div></div>':
+      c.kind==="del"?'<div class="cfrow"><b>'+esc(c.label)+'</b><p>You deleted this offline, but '+esc(c.by)+' edited it since.</p><div class="cfact"><button class="btn sm sec" data-cf="keep" data-i="'+i+'">Keep it</button><button class="btn sm danger" data-cf="del" data-i="'+i+'">Delete anyway</button></div></div>':
+      '<div class="cfrow"><b>'+esc(c.label)+'</b><p>'+esc(fieldName(c.field))+': you changed it to <b>'+esc(showVal(c.field,c.mine))+'</b> offline, '+esc(c.by)+' changed it to <b>'+esc(showVal(c.field,c.theirs))+'</b>.</p><div class="cfact"><button class="btn sm sec" data-cf="keep" data-i="'+i+'">Keep '+esc(c.by)+"'s</button><button class=\"btn sm\" data-cf=\"mine\" data-i=\""+i+'">Use mine</button></div></div>').join("");
+  };
+  const el=modal('<h2>Needs a decision</h2><p class="hint">These offline changes clashed with edits someone else made while you had no signal. Nothing was overwritten.</p><div id="cflist"></div><div class="actions"><button class="btn sec" data-act="close-modal">Later</button></div>');
+  el.addEventListener("click",async e=>{
+    const b=e.target.closest("[data-cf]");if(!b)return;const l=cfList(),i=+b.dataset.i,c=l[i];if(!c)return;
+    if(b.dataset.cf==="mine"){if(!await api(sb.from(c.t).update({[c.field]:c.mine}).eq("id",c.id)))return}
+    if(b.dataset.cf==="del"){if(!await api(sb.from(c.t).delete().eq("id",c.id)))return}
+    l.splice(i,1);cfSave(l);ui.dirty=true;draw();
+  });
+  draw();
+}
 
 // ---------- realtime ----------
-const APP_VERSION=44;
+const APP_VERSION=45;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -643,7 +820,7 @@ function teardown(){
   clearTimeout(retryT);
   if(rt&&sb){try{sb.removeChannel(rt)}catch(e){}}
   if(pc&&sb){try{sb.removeChannel(pc)}catch(e){}}
-  rt=null;pc=null;me=null;state=null;online={};lastTrack="";rtStatus=pcStatus=rtErr=pcErr="";
+  rt=null;pc=null;me=null;state=null;RAW=null;VIEW=null;online={};lastTrack="";rtStatus=pcStatus=rtErr=pcErr="";
   try{localStorage.removeItem(CACHE_KEY)}catch(e){}
 }
 
@@ -804,7 +981,7 @@ async function enter(session){
     await loadAll();subscribe();render();
   }catch(e){
     // offline fallback: show the last saved copy read-only
-    try{const c=JSON.parse(localStorage.getItem(CACHE_KEY));if(c&&c.state&&c.me&&c.me.email===(session.user.email||"").toLowerCase()){me=c.me;state=c.state;state.attach=new Map(Array.isArray(c.state.attach)?c.state.attach:[]);ui.offline=true;render();return}}catch(x){}
+    if(isNetErr(e)&&loadCache((session.user.email||"").toLowerCase())){render();return}
     toast(errText(e));
     me=null;render();
   }
@@ -922,7 +1099,7 @@ function render(){
   const tabs=[["cards","Cards"],["money","Money"],["summary","Summary"],["history","History"],["activity","Activity"]];
   document.documentElement.classList.add("shell");document.body.classList.add("shell");$("#app").classList.add("shell");
   $("#app").innerHTML='<header><div class="hl">'+(back||'<img class="logo" src="icon-192.png" alt="">')+'<div class="ht"><h1>'+esc(title)+"</h1><p>"+esc(sub)+'</p></div></div><div class="hr"><div id="presence">'+presenceHTML()+'</div><button class="avatar" data-act="settings" aria-label="Account and settings">'+avatarHTML(me.name,38)+"</button></div></header>"+
-  '<div id="scroller">'+(ui.offline?'<div class="banner"><span>Offline. Showing the last saved data. Scans are saved on this phone and upload when you have signal.</span></div>':"")+dueBanner()+"<main>"+body+"</main></div>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
+  '<div id="scroller">'+(ui.offline?'<div class="banner"><span>No signal. You can keep working: changes are saved on this phone and upload when signal is back.</span></div>':"")+dueBanner()+"<main>"+body+"</main></div>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
   "<nav>"+tabs.map(t=>'<button data-act="tab" data-id="'+t[0]+'" class="'+(!ui.hist&&ui.tab===t[0]||ui.hist&&t[0]==="history"?"on":"")+'"><span class="nb">'+ic(t[0],22)+"</span>"+t[1]+"</button>").join("")+"</nav>";
   const sc=$("#scroller");
   if(sc){sc.dataset.key=key;ui.pos[key]=top;sc.addEventListener("scroll",()=>{ui.pos[key]=sc.scrollTop},{passive:true});
@@ -997,7 +1174,7 @@ function cardsView(){
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
   return (isPast()?"":'<div id="qbox">'+queueBox()+"</div>")+(ui.filter==="sold"?soldHero(cs):'<div class="hero compact">'+(ui.filter==="all"||!ui.filter?mvPair(isPast()?"Total that week":"Total this week",round2(sum(cs,c=>c.mv)),round2(sum(cs,payoutOf)),"Unsold: market "+money(t.mv)+" | after % "+money(t.due)):filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
-  (isPast()?'<div class="quick"><button class="qbtn" data-act="sel-mode">'+ic("tag")+"Edit many</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>").replace('<div class="quick">','<div class="quick inline">'))+
+  (isPast()?'<div class="quick"><button class="qbtn" data-act="sel-mode">'+ic("tag")+"Edit many</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sell-scan">'+ic("cart")+'Scan to sell</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>").replace('<div class="quick">','<div class="quick inline">'))+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.filter(c=>c[0]!=="flag"||ui.filter==="flag"||cs.some(x=>statusOk(x,"flag"))).map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
   '<div class="minis"><select class="mini" id="sortsel" aria-label="Sort">'+opt("new","Newest first",ui.sort)+opt("value","Highest value",ui.sort)+opt("low","Lowest value",ui.sort)+opt("name","Name A-Z",ui.sort)+opt("age","Longest in stock",ui.sort)+'</select><select class="mini" id="ownersel" aria-label="Owner">'+opt("","All owners",ui.owner)+opt(P[0],P[0],ui.owner)+opt(P[1],P[1],ui.owner)+opt("Shared","Shared",ui.owner)+"</select></div>"+
@@ -1067,7 +1244,7 @@ function earlierMoney(){
 }
 function moneyView(){
   const w=VW(),wk=isPast()?' data-week="'+w.id+'"':"";
-  return (isPast()?"":earlierMoney())+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend"'+wk+'>'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
+  return (isPast()?"":'<div id="qbox">'+queueBox()+"</div>"+earlierMoney())+partnerTiles(w)+'<div class="sech"><h3>Buys and spend</h3><button class="btn sm" data-act="add-entry" data-kind="spend"'+wk+'>'+ic("plus",16)+'Add buy</button></div>'+moneyFilter("spend",w.spend)+
   '<div class="sech"><h3>Payouts</h3><button class="btn sm" data-act="add-entry" data-kind="payouts"'+wk+'>'+ic("plus",16)+"Add payout</button></div>"+moneyFilter("payouts",w.payouts);
 }
 function tilesFor(t){
@@ -1266,17 +1443,19 @@ async function readBarcodeFromImage(file){
   return null;
 }
 function newCardRow(o){return Object.assign({week_id:state.week.id},cardRow(Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,soldPrice:"",soldDate:"",notes:""},o)))}
-function scanModal(){
+// mode "sell": scanning picks cards that are already in the week, then opens Edit many to mark them sold
+function scanModal(mode){
+  const sell=mode==="sell",picked=[];
   const session=[],pending=new Set();
   const owners=["Shared",...state.settings.partners];
   const el=modal('<video id="scv" class="fs-video" playsinline muted autoplay></video><div class="fs-tap" id="sctap" role="button" aria-label="Tap to scan"></div><div class="fs-guide" id="scguide"><span>'+(autoSnapOn()?"Hold the front label in the box":"Fit the front label in the box, then tap")+'</span></div>'+
     '<div class="fs-msg" id="scmsg" hidden><p>Camera is off. Allow camera access, or use Photo of label or Type a cert.</p><button class="btn sm" id="scretry" type="button">Try camera again</button></div>'+
     '<div class="fs-flash" id="scflash"></div>'+
-    '<div class="fs-top"><button class="fs-ib" data-act="close-modal" type="button" aria-label="Close">'+ic("plus",22).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+'</button><h2>Scan certs</h2><button class="fs-chip" id="scopt" type="button"></button></div>'+
+    '<div class="fs-top"><button class="fs-ib" data-act="close-modal" type="button" aria-label="Close">'+ic("plus",22).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+'</button><h2>'+(sell?"Scan to sell":"Scan certs")+'</h2><button class="fs-chip" id="scopt" type="button"'+(sell?" hidden":"")+'></button></div>'+
     '<div class="fs-extra" id="scopts" hidden><div class="two"><div>'+field("Owner",'<select id="scown">'+owners.map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scauto"'+(autoSnapOn()?" checked":"")+'>Snap by itself when the label is held still</label><label class="chk"><input type="checkbox" id="scocr"'+(ocrOn()?" checked":"")+'>Read the card name from the front label</label><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label><button class="btn block sm" id="scoptok" type="button" style="margin-top:10px">Done</button></div>'+
     '<div class="fs-extra" id="sctype" hidden><div class="certrow"><input id="scin" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="Type a cert number"><button class="btn" id="scadd" type="button">Add</button></div><p class="tiny">A Bluetooth or USB barcode scanner works without opening this.</p></div>'+
     '<input type="file" id="scph" accept="image/*" capture="environment" hidden>'+
-    '<div class="fs-panel"><div class="fs-head"><div class="fs-count"><b id="sccount">0</b><span id="scsub">scanned</span></div><button class="fs-snap" id="scvsnap" type="button" aria-label="Snap a photo and read it">'+ic("camera",24)+'</button><div style="text-align:right"><button class="btn" data-act="close-modal" type="button">Done</button></div></div>'+
+    '<div class="fs-panel"><div class="fs-head"><div class="fs-count"><b id="sccount">0</b><span id="scsub">scanned</span></div><button class="fs-snap" id="scvsnap" type="button" aria-label="Snap a photo and read it">'+ic("camera",24)+'</button><div style="text-align:right">'+(sell?'<button class="btn" id="scsell" type="button" disabled>Sell</button>':'<button class="btn" data-act="close-modal" type="button">Done</button>')+'</div></div>'+
     '<div class="fs-tools"><button class="chip" id="scphb" type="button">Photo of label</button><button class="chip" id="sctypeb" type="button">Type a cert</button></div><div class="fs-list" id="sclist"></div></div>');
   el.classList.add("fullscan");el.parentNode.classList.add("fullscan");
   const vid=$("#scv",el),inp=$("#scin",el),own=$("#scown",el),pct=$("#scpct",el),psaBox=$("#scpsa",el),ocrBox=$("#scocr",el);
@@ -1287,6 +1466,13 @@ function scanModal(){
   const hit=()=>{const g=$("#scguide",el);g.classList.add("hit");setTimeout(()=>g.classList.remove("hit"),700)};
   const optLabel=()=>{const a=$("#scauto",el);$("#scopt",el).textContent=own.value+" | "+(+pct.value||state.settings.defaultPct)+"%"+(a&&a.checked?" | Auto":"")+(ocrBox.checked?" | Names":"")+(psaBox.checked?" | PSA":"")};
   const paint=()=>{
+    if(sell){
+      const mv=round2(sum(picked,c=>c.mv));
+      $("#sccount",el).textContent=String(picked.length);$("#scsub",el).textContent="picked | "+money(mv)+" market";
+      const b=$("#scsell",el);b.disabled=!picked.length;b.textContent=picked.length?"Sell "+picked.length:"Sell";
+      $("#sclist",el).innerHTML=picked.length?picked.map(c=>'<div class="fs-row"><div class="main"><div class="desc">'+esc(c.desc||"Cert "+c.cert)+'</div><div class="sub">Cert '+esc(c.cert)+" | "+money(+c.mv||0)+" market</div></div><button class=\"fs-del\" type=\"button\" data-del=\""+esc(c.cert)+'" aria-label="Remove '+esc(c.cert)+'">'+ic("trash",17)+"</button></div>").join(""):'<p class="hint" style="margin:8px 2px 2px">Scan each slab the customer is buying. When they are all picked, tap Sell to mark them sold together, at a % of market or a total for the lot.</p>';
+      return;
+    }
     const n=session.length,named=session.filter(x=>x.title).length;
     $("#sccount",el).textContent=String(n);
     $("#scsub",el).textContent=(n===1?"card":"cards")+" added";
@@ -1304,6 +1490,13 @@ function scanModal(){
   })};
   const add=async(raw,desc)=>{
     const cert=normalizeCert(raw);if(!cert||pending.has(cert))return;
+    if(sell){
+      if(picked.some(c=>c.cert===cert)){flash("Already picked "+cert);return}
+      const c=VW().cards.find(x=>x.cert===cert);
+      if(!c){const old=!isPast()&&stillSelling().find(x=>x.c.cert===cert);beep(false);flash(old?"That slab is from "+weekTag(old.h)+". Open that week to sell it.":"Not in this week: "+cert,"warn");return}
+      if(c.sold){beep(false);flash("Already sold: "+(c.desc||cert),"warn");return}
+      picked.unshift(c);beep(true);hit();flash("Picked: "+(c.desc||cert),"ok");paint();return;
+    }
     const inSess=session.find(x=>x.cert===cert);
     if(inSess){if(desc&&!inSess.title&&inSess.queued){qUpdate(cert,{desc});inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}if(desc&&!inSess.title&&inSess.id){if(await api(sb.from("cards").update({description:desc}).eq("id",inSess.id))){inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}}flash("Already scanned "+cert);return}
     const ex=state.week.cards.find(c=>c.cert===cert);
@@ -1311,27 +1504,26 @@ function scanModal(){
     const qd=qList().find(x=>x.cert===cert);
     if(qd){if(desc&&!qd.desc){qUpdate(cert,{desc});beep(true);hit();flash("Name added to "+cert,"ok");return}beep(false);flash("Already saved offline: "+cert,"warn");return}
     const fields={cert,desc:desc||"",owner:own.value,pct:+pct.value||state.settings.defaultPct};
-    // no signal: keep the scan on this phone and upload it later
-    const toQueue=()=>{qAdd(fields);const item={cert,owner:own.value,title:desc||"",st:"queued",queued:true,fresh:true};session.unshift(item);beep(true);hit();flash("Saved offline: "+cert+". Uploads when you have signal.","warn");paint()};
-    if(isOffline()){toQueue();return}
     pending.add(cert);
-    let r=null,netFail=false;
-    try{r=await sb.from("cards").insert(newCardRow(fields)).select("id").single()}catch(e){netFail=true}
+    // with no signal this is saved on the phone and uploads later
+    const r=await api(sb.from("cards").insert(newCardRow(fields)).select("id").single());
     pending.delete(cert);
-    if(netFail||(r&&r.error&&isNetErr(r.error))){toQueue();return}
-    if(!r||r.error){toast(errText(r&&r.error));beep(false);return}
+    if(!r){beep(false);return}
+    if(r.queued){const item={cert,id:r.data&&r.data.id,owner:own.value,title:desc||"",st:"queued",fresh:true};session.unshift(item);ui.dirty=true;beep(true);hit();flash("Saved offline: "+cert+". Uploads when you have signal.","warn");paint();return}
     const item={cert,id:r.data&&r.data.id,owner:own.value,title:desc||"",st:"saved",fresh:true};
     session.unshift(item);ui.dirty=true;beep(true);hit();flash(desc||!ocrBox.checked?"Added "+cert:"Added "+cert+". No name read, scan the front label to add it.","ok");paint();
     if(psaBox.checked&&item.id)enrich(item);
   };
   const remove=async cert=>{
+    if(sell){const i=picked.findIndex(c=>c.cert===cert);if(i>=0){picked.splice(i,1);paint();flash("Removed "+cert)}return}
     const item=session.find(x=>x.cert===cert);if(!item)return;
-    if(item.queued){qRemove(cert);session.splice(session.indexOf(item),1);paint();flash("Removed "+cert);return}
+    if(item.queued&&!item.id){qRemove(cert);session.splice(session.indexOf(item),1);paint();flash("Removed "+cert);return}
     let paths=[];try{const q=await sb.from("attachments").select("path").eq("card_id",item.id);paths=((q&&q.data)||[]).map(a=>a.path)}catch(e){}
     if(!await api(sb.from("cards").delete().eq("id",item.id)))return;
     removeFiles(paths);session.splice(session.indexOf(item),1);ui.dirty=true;paint();flash("Removed "+cert);
   };
   $("#sclist",el).addEventListener("click",e=>{const b=e.target.closest("[data-del]");if(b)remove(b.dataset.del)});
+  if(sell)$("#scsell",el).addEventListener("click",()=>{const ids=picked.map(c=>c.id);closeModal();ui.tab="cards";ui.sel=new Set(ids);render();bulkEditModal({sold:true})});
   // typing
   const submit=()=>{const v=inp.value;if(!v.trim()){inp.focus();return}inp.value="";add(v);inp.focus()};
   inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&inp.value.trim()){e.preventDefault();submit()}});
@@ -1748,7 +1940,7 @@ function cardModal(id,carry){
     (state.hasRepacker?(()=>{const reps=[...state.settings.repackers];if(d.repacker&&!reps.includes(d.repacker))reps.push(d.repacker);const cur=d.repacker||reps[0];return '<div id="rpwho"'+(d.repack?"":' style="display:none"')+">"+field("Which repacker",'<div class="seg" data-for="repacker">'+reps.map(n=>'<button type="button" data-v="'+esc(n)+'" data-h="">'+esc(n)+"</button>").join("")+'</div><select name="repacker" class="hidesel">'+reps.map(n=>"<option"+(n===cur?" selected":"")+">"+esc(n)+"</option>").join("")+"</select>")+"</div>"})():""):"")+
     field("Customer sale",'<div class="seg" data-for="disp">'+[["stock","Not sold","Still ours (or with a repacker)."],["sold","Sold","Sold to a customer for cash."],["traded","Traded","Traded to a customer."]].map(o=>'<button type="button" data-v="'+o[0]+'" data-h="'+o[2]+'">'+o[1]+"</button>").join("")+'</div><div class="seghint"></div><select name="disp" class="hidesel"><option value="stock"'+sel("stock")+'>Not sold to a customer</option><option value="sold"'+sel("sold")+'>Sold to a customer for cash</option><option value="traded"'+sel("traded")+'>Traded to a customer</option></select>')+
     '<div id="outbox" style="display:'+(dsp==="stock"?"none":"block")+'">'+
-      '<div id="soldf" style="display:'+(dsp==="sold"?"block":"none")+'"><div class="two"><div>'+field("Sale price ($)",'<input name="soldPrice" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="sold"?d.soldPrice:"")+'">')+"</div><div>"+field("% of market value",'<input name="soldPctMk" type="number" step="0.1" inputmode="decimal" value="'+esc(pctMk)+'">')+'</div></div><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-pp="'+q+'">'+q+'%</button>').join("")+"</div></div>"+
+      '<div id="soldf" style="display:'+(dsp==="sold"?"block":"none")+'"><div class="two"><div>'+field("Sale price ($)",'<input name="soldPrice" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="sold"?d.soldPrice:"")+'">')+"</div><div>"+field("% of market value",'<input name="soldPctMk" type="number" step="any" inputmode="decimal" value="'+esc(pctMk)+'">')+'</div></div><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-pp="'+q+'">'+q+'%</button>').join("")+"</div></div>"+
       '<div id="tradef" style="display:'+(dsp==="traded"?"block":"none")+'"><div class="two"><div>'+field("Trade value of this card ($)",'<input name="tradeValue" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="traded"?d.soldPrice:"")+'">')+"</div><div>"+field("Cash we received ($)",'<input name="tradeCash" type="number" step="0.01" inputmode="decimal" value="'+esc(d.tradeCash)+'">')+"</div></div>"+recvHTML+"</div>"+
       field("Date",'<input type="date" name="soldDate" value="'+esc(d.soldDate)+'">')+splitHTML+
     "</div>"+"</div>"+
@@ -1928,14 +2120,14 @@ function selBar(){
   return '<div class="selbar"><div><b>'+all.length+' selected</b><div class="sub">'+money(sum(cs,c=>c.mv))+' market</div></div><div class="selbtns"><button class="btn sm" data-act="sel-edit"'+(all.length?"":" disabled")+'>'+ic("edit",16)+'Edit</button><button class="btn sec sm" data-act="sel-del" aria-label="Delete selected"'+(all.length?"":" disabled")+' style="padding:6px 9px">'+ic("trash",18)+'</button><button class="btn sec sm" data-act="sel-cancel" aria-label="Done selecting" style="padding:6px 9px">'+ic("plus",18).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+"</button></div></div>";
 }
 // edit many cards at once: sold or not, sale %, repacker status, consignor %, owner. Blank means leave as is.
-function bulkEditModal(){
+function bulkEditModal(opt){
   const P=state.settings.partners,cards=VW().cards.filter(c=>ui.sel&&ui.sel.has(c.id));
   if(!cards.length){toast("Select at least one card");return}
   const reps=state.settings.repackers,totMv=sum(cards,c=>c.mv);
   const seg=(name,opts)=>'<div class="seg'+(opts.length>3?" wrap":"")+'" data-for="'+name+'">'+opts.map(o=>'<button type="button" data-v="'+esc(o[0])+'" data-h="'+esc(o[2]||"")+'">'+esc(o[1])+"</button>").join("")+'</div><div class="seghint"></div><select name="'+name+'" class="hidesel">'+opts.map(o=>'<option value="'+esc(o[0])+'">'+esc(o[1])+"</option>").join("")+"</select>";
   const el=modal("<h2>Edit "+plural(cards.length,"card")+'</h2><p class="hint">Market value of these cards: <b>'+money(totMv)+"</b>. Anything left on No change stays as it is.</p><form id=\"bef\">"+
     '<div class="sech"><h3>Sold</h3></div><div class="formbox">'+seg("sold",[["","No change","Leave sold and unsold as they are."],["no","Not sold","Marks them back in stock and clears the sale."],["yes","Sold","Sold to a customer at a % of market."]])+
-    '<div id="besale" hidden><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-bp="'+q+'">'+q+"%</button>").join("")+'</div><div class="two"><div>'+field("Sold at % of market",'<input name="pct" type="number" step="0.1" inputmode="decimal" value="90">')+"</div><div>"+field("Or total for the lot ($)",'<input name="total" type="number" step="0.01" inputmode="decimal">')+'</div></div><div class="preview" id="besum"></div>'+field("Sold date",'<input type="date" name="date" value="'+todayISO()+'">')+"</div></div>"+
+    '<div id="besale" hidden><div class="chips">'+[88,90,92,94].map(q=>'<button type="button" class="chip" data-bp="'+q+'">'+q+"%</button>").join("")+'</div><div class="two"><div>'+field("Sold at % of market",'<input name="pct" type="number" step="any" inputmode="decimal" value="90">')+"</div><div>"+field("Or total for the lot ($)",'<input name="total" type="number" step="0.01" inputmode="decimal">')+'</div></div><div class="preview" id="besum"></div>'+field("Sold date",'<input type="date" name="date" value="'+todayISO()+'">')+"</div></div>"+
     (state.hasRepack?'<div class="sech"><h3>Repacker status</h3></div><div class="formbox">'+seg("repack",[["*","No change","Leave as is."],["","Not sent","Clear the status."],["pending","Pending","Sent, waiting for approval."],["accepted","Accepted","Technically sold. The repacker owes the payout."],["rejected","Rejected","The repacker did not take it."]])+(state.hasRepacker?'<div id="bewho" hidden>'+field("Which repacker",seg("repacker",reps.map(n=>[n,n,""])))+"</div>":"")+"</div>":"")+
     '<div class="sech"><h3>Value</h3></div><div class="formbox"><div class="two"><div>'+field("Consignor %",'<input name="cpct" type="number" step="0.1" inputmode="decimal" placeholder="No change">')+"</div><div>"+field("Owner",'<select name="owner"><option value="">No change</option>'+["Shared",...P].map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div></div>"+
     (state.hasCost?field("Bought in (the lot these came from)",'<select name="lot"><option value="*">No change</option><option value="">Not linked</option>'+state.week.spend.filter(x=>x.kind!=="loan").slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>'<option value="'+x.id+'">'+esc(fmtDate(x.date)+" | "+x.partner+" | "+money(x.amount)+(x.note?" | "+x.note:""))+"</option>").join("")+"</select>")+'<p class="hint" id="lothint" style="margin:-4px 0 0">The buy amount is split across its slabs by market value. A cost typed on a slab is kept.</p>':"")+"</div>"+
@@ -1953,6 +2145,8 @@ function bulkEditModal(){
   f.total.addEventListener("input",()=>{const r=plan();if(f.total.value!==""&&r.eff!=null)f.pct.value=r.eff;paint()});
   el.querySelectorAll("[data-bp]").forEach(b=>b.addEventListener("click",()=>{f.total.value="";f.pct.value=b.dataset.bp;paint()}));
   paint();
+  // from Scan to sell: start on Sold
+  if(opt&&opt.sold){const sb2=el.querySelector('.seg[data-for="sold"] button[data-v="yes"]');if(sb2)sb2.click();if(f.sold.value!=="yes"){f.sold.value="yes";paint()}}
   f.addEventListener("submit",async e=>{
     e.preventDefault();
     const soldV=f.sold.value,rp=f.repack?f.repack.value:"*",cp=f.cpct.value,ow=f.owner.value,lot=f.lot?f.lot.value:"*",r=plan(),date=f.date.value||todayISO();
@@ -2318,13 +2512,15 @@ const actions={
   "psa-fill"(){psaFillModal()},
   back(){ui.hist=null;render()},
   filter(id){ui.filter=id;render()},
-  "q-flush"(){if(isOffline()){toast("Still no signal");return}flushQueue()},
+  async "q-flush"(){if(navigator.onLine===false){toast("Still no signal");return}if(ui.offline)await tryOnline();else syncAll();if(ui.offline)toast("Still no signal")},
+  conflicts(){conflictsModal()},
   "q-del"(id){if(confirm("Remove offline scan "+id+"?"))qRemove(id)},
   "add-card"(){cardModal(null)},
   "edit-card"(id){cardModal(id)},
   "view-card"(id){viewCardModal(id)},
   bulk(){bulkModal()},
   "scan-certs"(){scanModal()},
+  "sell-scan"(){scanModal("sell")},
   "import-csv"(){importChooser()},
   "sel-repack"(){repackBulkModal()},
   "add-entry"(id,t){entryModal(t.dataset.kind,null,t.dataset.week||null)},
@@ -2473,7 +2669,7 @@ async function boot(){
   // "Stay signed in" off: a fresh launch of the app signs out
   if(session&&localStorage.getItem(EPHEMERAL_KEY)==="1"&&!sessionStorage.getItem("repack-alive")){try{await sb.auth.signOut()}catch(e){}session=null}
   // no signal and the sign-in could not be checked: open the last saved copy so scanning still works
-  if(!session&&navigator.onLine===false){try{const c=JSON.parse(localStorage.getItem(CACHE_KEY));if(c&&c.state&&c.me){me=c.me;state=c.state;state.attach=new Map(Array.isArray(c.state.attach)?c.state.attach:[]);ui.offline=true;render();return}}catch(e){}}
+  if(!session&&navigator.onLine===false&&loadCache()){ui.noSession=true;render();return}
   if(session&&lockInfo()){showLock();tryUnlock()}
   if(session)await enter(session);else render();
 }
