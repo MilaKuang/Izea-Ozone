@@ -396,6 +396,9 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .sk.h{height:44px}.sk.b{height:120px;border-radius:18px}.sk.r{height:68px}
 @keyframes skel{from{background-position:200% 0}to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){.sk{animation:none}}
+img.freeze{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;animation:freezeIn .12s ease-out}
+@keyframes freezeIn{from{filter:brightness(1.8)}to{filter:none}}
+.qbtn.wide{width:100%;flex-direction:row;gap:8px;margin:-6px 0 14px}
 .hero .hsub{margin-top:6px;font-size:12px;opacity:.8}
 .hero .hwarn{margin-top:10px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
 .hero .brk{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
@@ -533,7 +536,7 @@ async function api(p){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=39;
+const APP_VERSION=41;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -1148,8 +1151,10 @@ function captureFrame(video){
   });
 }
 function shutterFx(host){const d=document.createElement("div");d.className="shutterfx";host.appendChild(d);setTimeout(()=>d.remove(),350)}
-async function snapAndRead(video,wrap){
-  wrap.classList.add("busy");const b=await captureFrame(video);const c=b?await readBarcodeFromImage(b):null;wrap.classList.remove("busy");return c;
+async function snapAndRead(video,wrap,guide){
+  wrap.classList.add("busy");const shot=await stillShot(video,guide||null);let c=null;
+  if(shot){const un=freezeOn(video,shot);try{c=await readShot(shot)}finally{setTimeout(un,c?350:0)}}
+  wrap.classList.remove("busy");return c;
 }
 // read a PSA barcode or QR code from a still photo (the phone camera focuses much better than live video)
 async function readBarcodeFromImage(file){
@@ -1268,10 +1273,15 @@ function scanModal(){
   let snapping=false;
   const snap=async()=>{
     if(snapping)return;if(!vid.srcObject){flash("Camera is off. Use Photo of label.","warn");return}
-    snapping=true;shutterFx(el);flash(ocrBox.checked?"Reading label...":"Reading...");
-    const cvO=ocrBox.checked?guideCanvas(vid,$("#scguide",el)):null;
-    let c=await snapAndRead(vid,el);
-    let o=null;if(cvO){el.classList.add("busy");o=await readName(Promise.resolve(cvO));el.classList.remove("busy")}
+    snapping=true;shutterFx(el);flash("Got it. Reading label...");
+    const shot=await stillShot(vid,$("#scguide",el));
+    if(!shot){snapping=false;flash("Camera is not ready yet. Tap again.","warn");return}
+    const un=freezeOn(vid,shot);el.classList.add("busy");
+    let c=null,o=null;
+    try{
+      const ocrP=ocrBox.checked?readName(Promise.resolve(cropCanvas(shot.cv,shot.W,shot.H,shot.f,true))):Promise.resolve(null);
+      c=await readShot(shot);o=await ocrP;
+    }finally{el.classList.remove("busy");setTimeout(un,250)}
     snapping=false;
     if(!c&&o&&o.cert)c=o.cert;
     if(c)add(c,o&&o.desc);else{beep(false);flash("No cert found. Fit the label in the box and tap again.","warn")}
@@ -1367,15 +1377,67 @@ async function ocrCanvas(cv){
   return parseLabel(d.text||"");
 }
 // crop the scan box out of a live video frame, scaled up so small label text reads well
-function guideCanvas(video,guide){
-  const vr=video.getBoundingClientRect(),gr=guide.getBoundingClientRect(),vw=video.videoWidth,vh=video.videoHeight;
-  if(!vw||!vr.width)return null;
+function guideFrac(video,guide){
+  const vw=video.videoWidth,vh=video.videoHeight;if(!vw)return null;
+  if(!guide)return{x:.12,y:.2,w:.76,h:.6};
+  const vr=video.getBoundingClientRect(),gr=guide.getBoundingClientRect();if(!vr.width)return null;
   const k=Math.max(vr.width/vw,vr.height/vh),ox=(vr.width-vw*k)/2,oy=(vr.height-vh*k)/2;
   const pad=0.08;let x=(gr.left-vr.left-ox)/k,y=(gr.top-vr.top-oy)/k,w=gr.width/k,h=gr.height/k;
   x-=w*pad;y-=h*pad;w*=1+2*pad;h*=1+2*pad;x=Math.max(0,x);y=Math.max(0,y);w=Math.min(vw-x,w);h=Math.min(vh-y,h);
-  const sc=Math.min(2.5,Math.max(1,1600/w)),cv=document.createElement("canvas");cv.width=Math.round(w*sc);cv.height=Math.round(h*sc);
-  const ctx=cv.getContext("2d");ctx.filter="grayscale(1) contrast(1.25)";ctx.drawImage(video,x,y,w,h,0,0,cv.width,cv.height);
-  return cv;
+  return{x:x/vw,y:y/vh,w:w/vw,h:h/vh};
+}
+function cropCanvas(src,W,H,f,gray,maxW){
+  const x=f.x*W,y=f.y*H,w=f.w*W,h=f.h*H,sc=Math.min(2.5,Math.max(1,(maxW||1600)/w)),cv=document.createElement("canvas");
+  cv.width=Math.max(1,Math.round(w*sc));cv.height=Math.max(1,Math.round(h*sc));
+  const ctx=cv.getContext("2d");if(gray)ctx.filter="grayscale(1) contrast(1.25)";ctx.drawImage(src,x,y,w,h,0,0,cv.width,cv.height);return cv;
+}
+function guideCanvas(video,guide){
+  const f=guideFrac(video,guide);return f?cropCanvas(video,video.videoWidth,video.videoHeight,f,true):null;
+}
+// how sharp a region is (variance of the Laplacian on a small grayscale copy); blurry frames score low
+function sharpness(src,W,H,f){
+  const w=200,h=Math.max(20,Math.round(w*(f.h*H)/(f.w*W))),cv=document.createElement("canvas");cv.width=w;cv.height=h;
+  const ctx=cv.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,f.x*W,f.y*H,f.w*W,f.h*H,0,0,w,h);
+  const d=ctx.getImageData(0,0,w,h).data,g=new Float32Array(w*h);for(let i=0;i<w*h;i++)g[i]=d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114;
+  let n=0,m=0,m2=0;for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x,l=4*g[i]-g[i-1]-g[i+1]-g[i-w]-g[i+w];n++;m+=l;m2+=l*l}
+  return n?m2/n-(m/n)*(m/n):0;
+}
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+// take the picture: a full-resolution photo where the browser can, otherwise the sharpest of a quick burst of frames
+async function stillShot(video,guide){
+  const vw=video.videoWidth,vh=video.videoHeight,f=guideFrac(video,guide);if(!vw||!f)return null;
+  try{
+    const tr=video.srcObject&&video.srcObject.getVideoTracks()[0];
+    if(window.ImageCapture&&tr){
+      const blob=await Promise.race([new ImageCapture(tr).takePhoto(),pause(2500).then(()=>{throw 0})]);
+      const bmp=await createImageBitmap(blob);
+      // only when the photo has the same shape as the preview, so the scan box still lines up
+      if(Math.abs(bmp.width/bmp.height-vw/vh)<0.02){const cv=document.createElement("canvas");cv.width=bmp.width;cv.height=bmp.height;cv.getContext("2d").drawImage(bmp,0,0);return{cv,f,W:bmp.width,H:bmp.height}}
+    }
+  }catch(e){}
+  await pause(110);
+  let best=null,score=-1;
+  for(let i=0;i<5;i++){
+    const cv=document.createElement("canvas");cv.width=vw;cv.height=vh;cv.getContext("2d").drawImage(video,0,0,vw,vh);
+    const sc=sharpness(cv,vw,vh,f);if(sc>score){score=sc;best=cv}
+    if(i<4)await pause(60);
+  }
+  return{cv:best,f,W:vw,H:vh};
+}
+const canvasBlob=(cv,q)=>new Promise(r=>cv.toBlob(b=>r(b),"image/jpeg",q||0.92));
+// hold the picture on screen while it is read, so the phone can move right away
+function freezeOn(video,shot){
+  const old=video.parentElement&&video.parentElement.querySelector("img.freeze");if(old)old.remove();
+  // right after the video, so the scan box, buttons and panel stay on top of it
+  const im=document.createElement("img");im.className="freeze";im.alt="";im.src=shot.cv.toDataURL("image/jpeg",0.7);video.after(im);
+  return()=>im.remove();
+}
+// read the cert from a still: barcode or QR inside the scan box first, then the whole picture
+async function readShot(shot){
+  const crop=cropCanvas(shot.cv,shot.W,shot.H,shot.f,false,1800);
+  let c=await readBarcodeFromImage(await canvasBlob(crop));
+  if(!c)c=await readBarcodeFromImage(await canvasBlob(shot.cv));
+  return c;
 }
 async function imageCanvas(blob,max){
   const bmp=window.createImageBitmap?await createImageBitmap(blob):await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(blob)});
@@ -1883,6 +1945,32 @@ function importChooser(){
     if(r){ui.importMode=mode;ui.importRepacker=r.dataset.rp;closeModal();$("#csvin").value="";$("#csvin").click()}
   });
 }
+// ---------- Card Ladder bridge ----------
+// lets the Card Ladder pricer (Claude in Chrome, on a computer where this app is open and signed in)
+// read which slabs need a value and write CL values straight back, saved like a normal edit
+window.RepackBridge={
+  version:1,
+  ready(){return !!(state&&me&&sb)},
+  pending(opts){
+    if(!this.ready())return{error:"Open the app and sign in first"};
+    const o=opts||{},w=state.week;
+    return w.cards.filter(c=>c.cert&&!c.sold&&(!o.onlyMissing||!(+c.mv>0))).map(c=>({cert:c.cert,name:c.desc||"",market:+c.mv||0,consignorPct:+c.pct||0,week:"Week of "+fmtDate(w.start)}));
+  },
+  async setValues(list){
+    if(!this.ready())return{error:"Open the app and sign in first"};
+    const w=state.week,by=new Map(w.cards.filter(c=>c.cert&&!c.sold).map(c=>[c.cert,c])),todo=[],out={updated:0,same:0,missing:[],failed:0,names:0};
+    (list||[]).forEach(x=>{
+      const cert=normalizeCert(x&&x.cert),v=parseMoney(x&&x.value);if(!cert||!(v>0))return;
+      const c=by.get(cert);if(!c){out.missing.push(cert);return}
+      const patch={};if(round2(+c.mv||0)!==round2(v))patch.market_value=round2(v);
+      if(x.name&&!c.desc){patch.description=String(x.name).slice(0,200);out.names++}
+      if(Object.keys(patch).length)todo.push({c,patch});else out.same++;
+    });
+    for(let k=0;k<todo.length;k+=8){const rs=await Promise.all(todo.slice(k,k+8).map(t=>api(sb.from("cards").update(t.patch).eq("id",t.c.id))));rs.forEach(r=>r?out.updated++:out.failed++)}
+    if(todo.length){await refreshRender();toast("Card Ladder: updated "+plural(out.updated,"slab"))}
+    return out;
+  }
+};
 function rowRepack(st,approved,hasCols){
   st=String(st||"").toLowerCase();approved=String(approved||"").trim().toLowerCase();
   if(/reject|declin|denied/.test(st))return "rejected";
