@@ -582,7 +582,7 @@ async function flushQueue(quiet){
 // a box at the top of Cards while scans are waiting
 function queueBox(){
   const l=qList();if(!l.length)return "";
-  return '<div class="cardbox qbox"><div class="owtop"><b>'+plural(l.length,"scan")+' waiting to upload</b><span>'+(isOffline()?"No signal":"Ready")+'</span></div><div class="qlist">'+l.slice().reverse().map(x=>'<div class="qrow"><span>'+esc(x.desc||"Cert "+x.cert)+'<small>Cert '+esc(x.cert)+" | "+esc(x.owner)+'</small></span><button class="fs-del" type="button" data-act="q-del" data-id="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",16)+"</button></div>").join("")+'</div><button class="btn sm block" data-act="q-flush" type="button"'+(isOffline()?" disabled":"")+">"+ic("upload",16)+"Upload now</button></div>";
+  return '<div class="cardbox qbox"><div class="owtop"><b>'+plural(l.length,"scan")+' waiting to upload</b><span>'+(isOffline()?"No signal":"Ready")+'</span></div><div class="qlist">'+l.slice().reverse().map(x=>'<div class="qrow"><span>'+esc(x.desc||"Cert "+x.cert)+'<small>'+(x.desc?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+(x.by?" | "+esc(x.by):"")+'</small></span><button class="fs-del" type="button" data-act="q-del" data-id="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",16)+"</button></div>").join("")+'</div><button class="btn sm block" data-act="q-flush" type="button"'+(isOffline()?" disabled":"")+">"+ic("upload",16)+"Upload now</button></div>";
 }
 function paintQueue(){const b=$("#qbox");if(b)b.innerHTML=queueBox()}
 window.addEventListener("online",()=>{setTimeout(async()=>{if(!sb)return;if(ui.offline){try{const r=await sb.auth.getSession();if(r.data&&r.data.session)await enter(r.data.session)}catch(e){}}else flushQueue()},1500)});
