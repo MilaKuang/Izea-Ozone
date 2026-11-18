@@ -95,6 +95,11 @@ select.mini{padding:8px 10px;font-size:14px;border-radius:10px;background:var(--
 .badge.ok{background:var(--chip);color:var(--ink2)}
 .badge.flag{background:#fee2e2;color:#b91c1c}
 @media(prefers-color-scheme:dark){.badge.flag{background:#4c1d1d;color:#fca5a5}}
+.qbox{border:1.5px solid var(--warn-ink)}
+.qlist{max-height:180px;overflow-y:auto;margin:6px 0 10px}
+.qrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px;font-weight:600}
+.qrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qrow small{display:block;font-weight:500;color:var(--mute);font-size:12px}
 .mvpair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .mvpair>div{min-width:0}
 .mvpair{margin-top:4px}
@@ -520,7 +525,8 @@ async function loadAll(){
   const attach=new Map();at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
   state={hasCarried:!!(kq&&!kq.error),hasCost:false,hasLoan:!!(lq&&!lq.error),hasRepack:!!(rp&&!rp.error),hasRepacker:!!(rq&&!rq.error),hasRepackerList:!!(st.data&&"repackers" in st.data),members:(mb&&!mb.error&&mb.data)||[],attach,settings:{partners:st.data.partners,resetDay:st.data.reset_day,defaultPct:+st.data.default_pct,repackers:(Array.isArray(st.data.repackers)&&st.data.repackers.length?st.data.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:au.data};
   ui.offline=false;
-  try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state}))}catch(e){}
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,state:Object.assign({},state,{attach:[...state.attach]})}))}catch(e){}
+  setTimeout(()=>flushQueue(),0);
 }
 async function refreshRender(){try{await loadAll()}catch(e){toast(errText(e))}render()}
 async function softRefresh(){
@@ -544,8 +550,47 @@ async function api(p){
   return r||{};
 }
 
+// ---------- offline scan queue ----------
+// scans made with no signal are kept on this phone, then uploaded to the current week once a connection is back
+const QUEUE_KEY="repack-queue";
+const isNetErr=e=>/fetch|network|Failed to|Load failed|NetworkError/i.test(String((e&&e.message)||e||""));
+const isOffline=()=>ui.offline||navigator.onLine===false;
+function qList(){try{const l=JSON.parse(localStorage.getItem(QUEUE_KEY)||"[]");return Array.isArray(l)?l:[]}catch(e){return []}}
+function qSave(l){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(l))}catch(e){toast("This phone is out of storage for offline scans")}}
+function qAdd(f){const l=qList();if(l.some(x=>x.cert===f.cert))return;l.push(Object.assign({at:new Date().toISOString(),by:me&&me.name||""},f));qSave(l);paintQueue()}
+function qUpdate(cert,patch){qSave(qList().map(x=>x.cert===cert?Object.assign(x,patch):x));paintQueue()}
+function qRemove(cert){qSave(qList().filter(x=>x.cert!==cert));paintQueue()}
+let flushing=false;
+async function flushQueue(quiet){
+  if(flushing||!sb||!me||!state||isOffline())return;
+  const l=qList();if(!l.length)return;
+  flushing=true;let up=0,dup=0;
+  try{
+    for(const x of l){
+      // already in the week (scanned on another phone meanwhile): fill a blank name, then drop it from the queue
+      const ex=state.week.cards.find(c=>c.cert===x.cert);
+      if(ex){if(x.desc&&!ex.desc){try{await sb.from("cards").update({description:x.desc}).eq("id",ex.id)}catch(e){}}qRemove(x.cert);dup++;continue}
+      let r;
+      try{r=await sb.from("cards").insert(newCardRow({cert:x.cert,desc:x.desc||"",owner:x.owner,pct:x.pct,date:(x.at||"").slice(0,10)||todayISO()})).select("id").single()}catch(e){break}
+      if(r&&r.error){if(r.error.code==="23505"){qRemove(x.cert);dup++;continue}if(!isNetErr(r.error)&&!quiet)toast("Could not upload "+x.cert+": "+errText(r.error));break}
+      qRemove(x.cert);up++;
+    }
+  }finally{flushing=false}
+  if(up||dup){toast((up?"Uploaded "+plural(up,"offline scan"):"")+(up&&dup?" | ":"")+(dup?dup+" already in this week":""));try{await loadAll()}catch(e){}if(!document.querySelector(".overlay"))render();else ui.dirty=true}
+  paintQueue();
+}
+// a box at the top of Cards while scans are waiting
+function queueBox(){
+  const l=qList();if(!l.length)return "";
+  return '<div class="cardbox qbox"><div class="owtop"><b>'+plural(l.length,"scan")+' waiting to upload</b><span>'+(isOffline()?"No signal":"Ready")+'</span></div><div class="qlist">'+l.slice().reverse().map(x=>'<div class="qrow"><span>'+esc(x.desc||"Cert "+x.cert)+'<small>Cert '+esc(x.cert)+" | "+esc(x.owner)+'</small></span><button class="fs-del" type="button" data-act="q-del" data-id="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",16)+"</button></div>").join("")+'</div><button class="btn sm block" data-act="q-flush" type="button"'+(isOffline()?" disabled":"")+">"+ic("upload",16)+"Upload now</button></div>";
+}
+function paintQueue(){const b=$("#qbox");if(b)b.innerHTML=queueBox()}
+window.addEventListener("online",()=>{setTimeout(async()=>{if(!sb)return;if(ui.offline){try{const r=await sb.auth.getSession();if(r.data&&r.data.session)await enter(r.data.session)}catch(e){}}else flushQueue()},1500)});
+window.addEventListener("offline",paintQueue);
+setInterval(()=>{if(qList().length&&!document.hidden)flushQueue(true)},30000);
+
 // ---------- realtime ----------
-const APP_VERSION=43;
+const APP_VERSION=44;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -759,7 +804,7 @@ async function enter(session){
     await loadAll();subscribe();render();
   }catch(e){
     // offline fallback: show the last saved copy read-only
-    try{const c=JSON.parse(localStorage.getItem(CACHE_KEY));if(c&&c.state&&c.me&&c.me.email===(session.user.email||"").toLowerCase()){me=c.me;state=c.state;ui.offline=true;render();return}}catch(x){}
+    try{const c=JSON.parse(localStorage.getItem(CACHE_KEY));if(c&&c.state&&c.me&&c.me.email===(session.user.email||"").toLowerCase()){me=c.me;state=c.state;state.attach=new Map(Array.isArray(c.state.attach)?c.state.attach:[]);ui.offline=true;render();return}}catch(x){}
     toast(errText(e));
     me=null;render();
   }
@@ -877,7 +922,7 @@ function render(){
   const tabs=[["cards","Cards"],["money","Money"],["summary","Summary"],["history","History"],["activity","Activity"]];
   document.documentElement.classList.add("shell");document.body.classList.add("shell");$("#app").classList.add("shell");
   $("#app").innerHTML='<header><div class="hl">'+(back||'<img class="logo" src="icon-192.png" alt="">')+'<div class="ht"><h1>'+esc(title)+"</h1><p>"+esc(sub)+'</p></div></div><div class="hr"><div id="presence">'+presenceHTML()+'</div><button class="avatar" data-act="settings" aria-label="Account and settings">'+avatarHTML(me.name,38)+"</button></div></header>"+
-  '<div id="scroller">'+(ui.offline?'<div class="banner"><span>Offline. Showing the last saved data. Reconnect to make changes.</span></div>':"")+dueBanner()+"<main>"+body+"</main></div>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
+  '<div id="scroller">'+(ui.offline?'<div class="banner"><span>Offline. Showing the last saved data. Scans are saved on this phone and upload when you have signal.</span></div>':"")+dueBanner()+"<main>"+body+"</main></div>"+(ui.sel&&!ui.hist&&ui.tab==="cards"?selBar():"")+
   "<nav>"+tabs.map(t=>'<button data-act="tab" data-id="'+t[0]+'" class="'+(!ui.hist&&ui.tab===t[0]||ui.hist&&t[0]==="history"?"on":"")+'"><span class="nb">'+ic(t[0],22)+"</span>"+t[1]+"</button>").join("")+"</nav>";
   const sc=$("#scroller");
   if(sc){sc.dataset.key=key;ui.pos[key]=top;sc.addEventListener("scroll",()=>{ui.pos[key]=sc.scrollTop},{passive:true});
@@ -950,7 +995,7 @@ function cardsView(){
   const t=calc(VW()),P=state.settings.partners,cs=VW().cards.filter(c=>!ui.owner||c.owner===ui.owner);
   const chips=[["all","All"],["stock","In stock"],["pending","Pending"],["accepted","Accepted"],["sold","Sold/Traded"],["need","Needs details"],["flag","Flagged"]];
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
-  return (ui.filter==="sold"?soldHero(cs):'<div class="hero compact">'+(ui.filter==="all"||!ui.filter?mvPair(isPast()?"Total that week":"Total this week",round2(sum(cs,c=>c.mv)),round2(sum(cs,payoutOf)),"Unsold: market "+money(t.mv)+" | after % "+money(t.due)):filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
+  return (isPast()?"":'<div id="qbox">'+queueBox()+"</div>")+(ui.filter==="sold"?soldHero(cs):'<div class="hero compact">'+(ui.filter==="all"||!ui.filter?mvPair(isPast()?"Total that week":"Total this week",round2(sum(cs,c=>c.mv)),round2(sum(cs,payoutOf)),"Unsold: market "+money(t.mv)+" | after % "+money(t.due)):filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
   (isPast()?'<div class="quick"><button class="qbtn" data-act="sel-mode">'+ic("tag")+"Edit many</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>").replace('<div class="quick">','<div class="quick inline">'))+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
@@ -1245,7 +1290,7 @@ function scanModal(){
     const n=session.length,named=session.filter(x=>x.title).length;
     $("#sccount",el).textContent=String(n);
     $("#scsub",el).textContent=(n===1?"card":"cards")+" added";
-    $("#sclist",el).innerHTML=n?session.map(x=>'<div class="fs-row'+(x.fresh?" new":"")+'"><div class="main"><div class="desc">'+esc(x.title||"Cert "+x.cert)+'</div><div class="sub">'+(x.title?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+'</div></div><span class="badge '+(x.st==="err"?"ok":x.st==="busy"?"ok":"sold")+'">'+(x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":x.title?"Name read":"Saved")+'</span><button class="fs-del" type="button" data-del="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",17)+"</button></div>").join(""):'<p class="hint" style="margin:8px 2px 2px">Hold the front label in the box. It snaps by itself once the label is still, or tap anywhere. The cert and card name are saved right away.</p>';
+    $("#sclist",el).innerHTML=n?session.map(x=>'<div class="fs-row'+(x.fresh?" new":"")+'"><div class="main"><div class="desc">'+esc(x.title||"Cert "+x.cert)+'</div><div class="sub">'+(x.title?"Cert "+esc(x.cert)+" | ":"")+esc(x.owner)+'</div></div><span class="badge '+(x.st==="queued"?"rp-pending":x.st==="err"?"ok":x.st==="busy"?"ok":"sold")+'">'+(x.st==="queued"?"Saved offline":x.st==="busy"?"Looking up":x.st==="err"?"Saved, no PSA":x.st==="ok"?"PSA added":x.title?"Name read":"Saved")+'</span><button class="fs-del" type="button" data-del="'+esc(x.cert)+'" aria-label="Remove '+esc(x.cert)+'">'+ic("trash",17)+"</button></div>").join(""):'<p class="hint" style="margin:8px 2px 2px">Hold the front label in the box. It snaps by itself once the label is still, or tap anywhere. The cert and card name are saved right away.</p>';
     session.forEach(x=>{x.fresh=false});
   };
   let chain=Promise.resolve();
@@ -1260,19 +1305,28 @@ function scanModal(){
   const add=async(raw,desc)=>{
     const cert=normalizeCert(raw);if(!cert||pending.has(cert))return;
     const inSess=session.find(x=>x.cert===cert);
-    if(inSess){if(desc&&!inSess.title&&inSess.id){if(await api(sb.from("cards").update({description:desc}).eq("id",inSess.id))){inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}}flash("Already scanned "+cert);return}
+    if(inSess){if(desc&&!inSess.title&&inSess.queued){qUpdate(cert,{desc});inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}if(desc&&!inSess.title&&inSess.id){if(await api(sb.from("cards").update({description:desc}).eq("id",inSess.id))){inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}}flash("Already scanned "+cert);return}
     const ex=state.week.cards.find(c=>c.cert===cert);
     if(ex){if(desc&&!ex.desc){if(await api(sb.from("cards").update({description:desc}).eq("id",ex.id))){ex.desc=desc;ui.dirty=true;beep(true);hit();flash("Name added to "+cert,"ok");return}}beep(false);flash("Already in this week: "+cert,"warn");return}
+    const qd=qList().find(x=>x.cert===cert);
+    if(qd){if(desc&&!qd.desc){qUpdate(cert,{desc});beep(true);hit();flash("Name added to "+cert,"ok");return}beep(false);flash("Already saved offline: "+cert,"warn");return}
+    const fields={cert,desc:desc||"",owner:own.value,pct:+pct.value||state.settings.defaultPct};
+    // no signal: keep the scan on this phone and upload it later
+    const toQueue=()=>{qAdd(fields);const item={cert,owner:own.value,title:desc||"",st:"queued",queued:true,fresh:true};session.unshift(item);beep(true);hit();flash("Saved offline: "+cert+". Uploads when you have signal.","warn");paint()};
+    if(isOffline()){toQueue();return}
     pending.add(cert);
-    const r=await api(sb.from("cards").insert(newCardRow({cert,desc:desc||"",owner:own.value,pct:+pct.value||state.settings.defaultPct})).select("id").single());
+    let r=null,netFail=false;
+    try{r=await sb.from("cards").insert(newCardRow(fields)).select("id").single()}catch(e){netFail=true}
     pending.delete(cert);
-    if(!r){beep(false);return}
+    if(netFail||(r&&r.error&&isNetErr(r.error))){toQueue();return}
+    if(!r||r.error){toast(errText(r&&r.error));beep(false);return}
     const item={cert,id:r.data&&r.data.id,owner:own.value,title:desc||"",st:"saved",fresh:true};
     session.unshift(item);ui.dirty=true;beep(true);hit();flash(desc||!ocrBox.checked?"Added "+cert:"Added "+cert+". No name read, scan the front label to add it.","ok");paint();
     if(psaBox.checked&&item.id)enrich(item);
   };
   const remove=async cert=>{
     const item=session.find(x=>x.cert===cert);if(!item)return;
+    if(item.queued){qRemove(cert);session.splice(session.indexOf(item),1);paint();flash("Removed "+cert);return}
     let paths=[];try{const q=await sb.from("attachments").select("path").eq("card_id",item.id);paths=((q&&q.data)||[]).map(a=>a.path)}catch(e){}
     if(!await api(sb.from("cards").delete().eq("id",item.id)))return;
     removeFiles(paths);session.splice(session.indexOf(item),1);ui.dirty=true;paint();flash("Removed "+cert);
@@ -2264,6 +2318,8 @@ const actions={
   "psa-fill"(){psaFillModal()},
   back(){ui.hist=null;render()},
   filter(id){ui.filter=id;render()},
+  "q-flush"(){if(isOffline()){toast("Still no signal");return}flushQueue()},
+  "q-del"(id){if(confirm("Remove offline scan "+id+"?"))qRemove(id)},
   "add-card"(){cardModal(null)},
   "edit-card"(id){cardModal(id)},
   "view-card"(id){viewCardModal(id)},
@@ -2416,6 +2472,8 @@ async function boot(){
   if(ui.recovery){render();return}
   // "Stay signed in" off: a fresh launch of the app signs out
   if(session&&localStorage.getItem(EPHEMERAL_KEY)==="1"&&!sessionStorage.getItem("repack-alive")){try{await sb.auth.signOut()}catch(e){}session=null}
+  // no signal and the sign-in could not be checked: open the last saved copy so scanning still works
+  if(!session&&navigator.onLine===false){try{const c=JSON.parse(localStorage.getItem(CACHE_KEY));if(c&&c.state&&c.me){me=c.me;state=c.state;state.attach=new Map(Array.isArray(c.state.attach)?c.state.attach:[]);ui.offline=true;render();return}}catch(e){}}
   if(session&&lockInfo()){showLock();tryUnlock()}
   if(session)await enter(session);else render();
 }
