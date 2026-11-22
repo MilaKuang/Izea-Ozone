@@ -10,8 +10,8 @@ Setup, once (Windows: in PowerShell):
 
 The first run asks for your Repack Ledger email and password (the password is not saved) and opens a Chrome
 window on Card Ladder. Sign in to Card Ladder in that window. After that it remembers both.
-It also checks this week every few minutes on its own and prices any slab that has no value yet, so new scans get
-their value without anyone asking. Run with --no-auto to only price when someone asks from the app.
+It also watches this week on its own and prices any slab that has no value yet, usually within seconds of the scan,
+without anyone asking. Run with --no-auto to only price when someone asks from the app.
 Stop it with Ctrl+C. Run with --signout to forget the Repack Ledger sign-in.
 """
 import getpass
@@ -28,9 +28,8 @@ from pathlib import Path
 SUPA = os.environ.get("REPACK_SUPA", "https://cqzvybrykzuqfqjffzqc.supabase.co")
 KEY = "sb_publishable_hX8JScS-XvpaYWPPhnaPSg_oKoBnA-d"
 CL_URL = os.environ.get("REPACK_CL", "https://app.cardladder.com/sales-history")
-EVERY = float(os.environ.get("REPACK_EVERY", "15"))   # seconds between checks for a request
+EVERY = float(os.environ.get("REPACK_EVERY", "5"))    # seconds between checks for a request or a new slab
 FLAG = 25                                             # flag slabs whose recent sales are this % off the CL value
-AUTO_MIN = float(os.environ.get("REPACK_AUTO_MIN", "5"))  # minutes between automatic checks for slabs with no value
 RETRY_HOURS = 12                                      # a cert Card Ladder did not have is tried again after this long
 HOME = Path.home() / ".repack-pricer"
 SESSION = HOME / "session.json"
@@ -317,11 +316,10 @@ def main():
             input()
             while not cl.ready(30):
                 input("Card Ladder still is not showing Sales History. Sign in there, then press Enter.")
-        log("Ready as \"%s\". %s Press Ctrl+C to stop." % (me, "Pricing new slabs every %g min and when asked from the app." % AUTO_MIN if auto else "Waiting for requests from the app."))
-        next_auto = 0
+        log("Ready as \"%s\". %s Press Ctrl+C to stop." % (me, "Pricing new slabs as they come in and when asked from the app." if auto else "Waiting for requests from the app."))
         while True:
             try:
-                rows = set_pricer({"last_seen": now(), "worker": me + (" | prices new slabs every %g min" % AUTO_MIN if auto else "")})
+                rows = set_pricer({"last_seen": now(), "worker": me + (" | prices new slabs automatically" if auto else "")})
                 if not rows:
                     sys.exit("This account cannot see the pricer. Run upgrade-7.sql and sign in with a member account.")
                 if rows[0]["status"] == "pending":
@@ -330,8 +328,7 @@ def main():
                         run(cl, claimed[0])
                         continue
                 # automatic: price slabs with no value, without anyone asking
-                elif auto and time.time() >= next_auto and rows[0]["status"] != "working":
-                    next_auto = time.time() + AUTO_MIN * 60
+                elif auto and rows[0]["status"] != "working":
                     skip = skip_list()
                     if week_cards("missing", skip):
                         claimed = set_pricer({"status": "working", "scope": "missing", "requested_by": "Automatic (%s)" % me, "requested_at": now(),
