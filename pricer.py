@@ -10,6 +10,8 @@ Setup, once (Windows: in PowerShell):
 
 The first run asks for your Repack Ledger email and password (the password is not saved) and opens a Chrome
 window on Card Ladder. Sign in to Card Ladder in that window. After that it remembers both.
+It also checks this week every few minutes on its own and prices any slab that has no value yet, so new scans get
+their value without anyone asking. Run with --no-auto to only price when someone asks from the app.
 Stop it with Ctrl+C. Run with --signout to forget the Repack Ledger sign-in.
 """
 import getpass
@@ -28,8 +30,29 @@ KEY = "sb_publishable_hX8JScS-XvpaYWPPhnaPSg_oKoBnA-d"
 CL_URL = os.environ.get("REPACK_CL", "https://app.cardladder.com/sales-history")
 EVERY = float(os.environ.get("REPACK_EVERY", "15"))   # seconds between checks for a request
 FLAG = 25                                             # flag slabs whose recent sales are this % off the CL value
+AUTO_MIN = float(os.environ.get("REPACK_AUTO_MIN", "5"))  # minutes between automatic checks for slabs with no value
+RETRY_HOURS = 12                                      # a cert Card Ladder did not have is tried again after this long
 HOME = Path.home() / ".repack-pricer"
 SESSION = HOME / "session.json"
+NOTFOUND = HOME / "not-found.json"
+
+
+def skip_list():
+    """certs Card Ladder did not have recently, so automatic checks do not look them up again every few minutes"""
+    try:
+        d = json.loads(NOTFOUND.read_text())
+    except Exception:
+        d = {}
+    cut = time.time() - RETRY_HOURS * 3600
+    return {c: t for c, t in d.items() if t > cut}
+
+
+def remember_not_found(certs):
+    d = skip_list()
+    for c in certs:
+        d[c] = time.time()
+    HOME.mkdir(exist_ok=True)
+    NOTFOUND.write_text(json.dumps(d))
 
 
 def now():
@@ -217,16 +240,20 @@ class CardLadder:
 
 
 # ---------- the job ----------
-def run(cl, job):
+def week_cards(scope, skip=()):
+    wk = rest("GET", "weeks?closed=eq.false&select=id")
+    if not wk:
+        raise RuntimeError("No open week")
+    cards = rest("GET", "cards?week_id=eq.%s&sold=eq.false&cert=not.is.null&select=id,cert,description,market_value&order=seq.asc" % wk[0]["id"])
+    return [c for c in cards if str(c["cert"]).strip() and str(c["cert"]) not in skip and (scope == "all" or not (float(c["market_value"] or 0) > 0))]
+
+
+def run(cl, job, skip=()):
     out = {"updated": 0, "same": 0, "names": 0, "notFound": [], "flagged": []}
     try:
         if not cl.ready():
             raise RuntimeError("Card Ladder is signed out or not loading on the pricer computer.")
-        wk = rest("GET", "weeks?closed=eq.false&select=id")
-        if not wk:
-            raise RuntimeError("No open week")
-        cards = rest("GET", "cards?week_id=eq.%s&sold=eq.false&cert=not.is.null&select=id,cert,description,market_value&order=seq.asc" % wk[0]["id"])
-        cards = [c for c in cards if str(c["cert"]).strip() and (job["scope"] == "all" or not (float(c["market_value"] or 0) > 0))]
+        cards = week_cards(job["scope"], skip)
         set_pricer({"total": len(cards), "progress": 0})
         log("Request from %s: %d slab%s" % (job.get("requested_by") or "someone", len(cards), "" if len(cards) == 1 else "s"))
         for n, c in enumerate(cards):
@@ -258,6 +285,7 @@ def run(cl, job):
                 off = round((a - r["cl"]) / r["cl"] * 100)
                 if abs(off) >= FLAG:
                     out["flagged"].append({"cert": str(c["cert"]), "name": c["description"] or patch.get("description", ""), "cl": r["cl"], "avg3": a, "off": off})
+        remember_not_found(out["notFound"])
         set_pricer({"status": "done", "progress": len(cards), "current_card": None, "finished_at": now(), "result": out, "message": None}, "&status=eq.working")
         log("Done: %d updated, %d unchanged%s" % (out["updated"], out["same"], ", %d not found" % len(out["notFound"]) if out["notFound"] else ""))
     except Exception as e:
@@ -278,6 +306,7 @@ def main():
         from playwright.sync_api import sync_playwright
     except ImportError:
         sys.exit("Playwright is not installed. Run:  pip install playwright")
+    auto = "--no-auto" not in sys.argv
     auth = Auth()
     auth.token()
     me = auth.s.get("name", "Card Ladder PC")
@@ -288,10 +317,11 @@ def main():
             input()
             while not cl.ready(30):
                 input("Card Ladder still is not showing Sales History. Sign in there, then press Enter.")
-        log("Ready as \"%s\". Waiting for requests from the app. Press Ctrl+C to stop." % me)
+        log("Ready as \"%s\". %s Press Ctrl+C to stop." % (me, "Pricing new slabs every %g min and when asked from the app." % AUTO_MIN if auto else "Waiting for requests from the app."))
+        next_auto = 0
         while True:
             try:
-                rows = set_pricer({"last_seen": now(), "worker": me})
+                rows = set_pricer({"last_seen": now(), "worker": me + (" | prices new slabs every %g min" % AUTO_MIN if auto else "")})
                 if not rows:
                     sys.exit("This account cannot see the pricer. Run upgrade-7.sql and sign in with a member account.")
                 if rows[0]["status"] == "pending":
@@ -299,6 +329,17 @@ def main():
                     if claimed:
                         run(cl, claimed[0])
                         continue
+                # automatic: price slabs with no value, without anyone asking
+                elif auto and time.time() >= next_auto and rows[0]["status"] != "working":
+                    next_auto = time.time() + AUTO_MIN * 60
+                    skip = skip_list()
+                    if week_cards("missing", skip):
+                        claimed = set_pricer({"status": "working", "scope": "missing", "requested_by": "Automatic (%s)" % me, "requested_at": now(),
+                                              "started_at": now(), "finished_at": None, "progress": 0, "total": 0, "message": None, "result": None},
+                                             "&status=not.in.(pending,working)")
+                        if claimed:
+                            run(cl, claimed[0], skip)
+                            continue
             except KeyboardInterrupt:
                 raise
             except SystemExit:
