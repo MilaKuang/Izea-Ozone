@@ -1,4 +1,4 @@
-const CACHE = "repack-ledger-v46";
+const CACHE = "repack-ledger-v47";
 // the card name reader is large and rarely changes, so it lives in its own cache that app updates keep
 const OCR_CACHE = "repack-ocr-1";
 const ASSETS = ["./", "./index.html", "./zxing.min.js", "./supabase.js", "./config.js", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
