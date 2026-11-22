@@ -372,7 +372,14 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .wkbar.past .wkname{border-color:var(--warn);background:var(--warn-bg,var(--card))}
 .pastbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--warn);color:var(--warn-ink);border-radius:12px;padding:8px 10px;margin:-4px 0 12px;font-size:13px;font-weight:600}
 .pastbar .btn{flex:none}
-.wklist{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
+.wklist{display:flex;flex-direction:column;gap:8px;max-height:58vh;overflow:auto;padding-bottom:4px}
+.wkctl{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.wkctl input{width:100%}
+.wkctl .chips{margin:0}
+.wkctl .chip i{font-style:normal;opacity:.6;margin-left:2px}
+.wkmonth{position:sticky;top:0;z-index:1;background:var(--card);display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:700;color:var(--ink2);padding:8px 2px 4px;text-transform:uppercase;letter-spacing:.03em}
+.wkmonth span{font-weight:500;text-transform:none;letter-spacing:0;color:var(--mute);font-size:12px}
+.wkfound{display:flex;align-items:center;gap:4px;color:var(--acc)!important;font-weight:600}
 .wkrow{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:10px 12px;color:var(--ink)}
 .wkrow.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
 .wkrow .main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -402,6 +409,21 @@ html.kbopen .sheet .actions.stick{bottom:-14px;margin-bottom:-14px;padding-botto
 .hero.compact .hstats{margin-top:10px;padding-top:9px}
 .hero.compact .hstats b{font-size:16px}
 .quick.inline{gap:6px;margin-bottom:12px;grid-template-columns:repeat(2,1fr)}
+.quick.inline:has(.qbtn:nth-child(5)){grid-template-columns:repeat(6,1fr)}
+.quick.inline:has(.qbtn:nth-child(5)) .qbtn{grid-column:span 2}
+.quick.inline:has(.qbtn:nth-child(5)) .qbtn:nth-child(n+4){grid-column:span 3}
+.prline{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin:4px 0 12px}
+.prline i{width:9px;height:9px;border-radius:50%;background:var(--mute);flex:none}
+.prline.on i{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18)}
+.prline.off{color:var(--mute)}
+.prbar{height:8px;border-radius:6px;background:var(--chip);overflow:hidden;margin:8px 0 4px}
+.prbar b{display:block;height:100%;background:var(--acc);transition:width .4s}
+#prscope .mi.on{background:var(--acc-soft);color:var(--acc-soft-ink)}
+#prscope .mi.on .ic{color:var(--acc)}
+#prscope{margin-bottom:12px}
+.prflag{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+.prflag td{padding:5px 4px;border-top:1px solid var(--line);vertical-align:top}
+.prflag td:not(:first-child){text-align:right;white-space:nowrap}
 .quick.inline .qbtn{flex-direction:row;gap:6px;padding:8px 6px;border-radius:12px;font-size:12.5px}
 .prow .btn{min-height:44px}
 .minis select,.minis .mini{min-height:38px;padding-top:7px;padding-bottom:7px;font-size:14px}
@@ -514,7 +536,7 @@ async function fetchAll(table,order){
 let RAW=null,VIEW=null;
 const withTO=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error("Failed to fetch (timed out)")),ms||12000))]);
 async function fetchRaw(){
-  const [st,wk,cd,sp,po,at,au,mb,rp,rq,lq,kq]=await withTO(Promise.all([
+  const [st,wk,cd,sp,po,at,au,mb,rp,rq,lq,kq,pq]=await withTO(Promise.all([
     sb.from("settings").select("*").eq("id",1).single(),
     sb.from("weeks").select("*").order("start_date",{ascending:true}),
     fetchAll("cards"),fetchAll("spend"),fetchAll("payouts"),fetchAll("attachments","created_at"),
@@ -523,10 +545,11 @@ async function fetchRaw(){
     sb.from("cards").select("repack_status").limit(1),
     sb.from("cards").select("repacker").limit(1),
     sb.from("spend").select("kind").limit(1),
-    sb.from("cards").select("carried").limit(1)
+    sb.from("cards").select("carried").limit(1),
+    Promise.resolve(sb.from("pricer").select("id").limit(1)).catch(e=>({error:e}))
   ]),20000);
   for(const r of [st,wk,au])if(r.error)throw r.error;
-  return{st:st.data,wk:wk.data,cd,sp,po,at,au:au.data,mb:(mb&&!mb.error&&mb.data)||[],f:{carried:!!(kq&&!kq.error),loan:!!(lq&&!lq.error),repack:!!(rp&&!rp.error),repacker:!!(rq&&!rq.error)}};
+  return{st:st.data,wk:wk.data,cd,sp,po,at,au:au.data,mb:(mb&&!mb.error&&mb.data)||[],f:{pricer:!!(pq&&!pq.error),carried:!!(kq&&!kq.error),loan:!!(lq&&!lq.error),repack:!!(rp&&!rp.error),repacker:!!(rq&&!rq.error)}};
 }
 function buildState(raw){
   const by=(rows,map)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.week_id))m.set(r.week_id,[]);m.get(r.week_id).push(map(r))});return m};
@@ -537,7 +560,7 @@ function buildState(raw){
   const history=raw.wk.filter(w=>w.closed).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||"")||b.start_date.localeCompare(a.start_date)).map(mk);
   const attach=new Map();raw.at.forEach(a=>{const k=a.card_id||a.spend_id||a.payout_id;if(!attach.has(k))attach.set(k,[]);attach.get(k).push({id:a.id,path:a.path,caption:a.caption})});
   const st=raw.st;
-  return{hasCarried:raw.f.carried,hasCost:false,hasLoan:raw.f.loan,hasRepack:raw.f.repack,hasRepacker:raw.f.repacker,hasRepackerList:!!(st&&"repackers" in st),members:raw.mb,attach,settings:{partners:st.partners,resetDay:st.reset_day,defaultPct:+st.default_pct,repackers:(Array.isArray(st.repackers)&&st.repackers.length?st.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:raw.au};
+  return{hasPricer:!!raw.f.pricer,hasCarried:raw.f.carried,hasCost:false,hasLoan:raw.f.loan,hasRepack:raw.f.repack,hasRepacker:raw.f.repacker,hasRepackerList:!!(st&&"repackers" in st),members:raw.mb,attach,settings:{partners:st.partners,resetDay:st.reset_day,defaultPct:+st.default_pct,repackers:(Array.isArray(st.repackers)&&st.repackers.length?st.repackers:["Triumph","LastPack"])},week:mk(open),history,audit:raw.au};
 }
 // rebuild what the app shows: the server copy with this phone's not-yet-uploaded changes on top
 function rebuild(){VIEW=applyOutbox(RAW);state=buildState(VIEW)}
@@ -769,7 +792,7 @@ function conflictsModal(){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=47;
+const APP_VERSION=48;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -1006,6 +1029,7 @@ const ICON={
   upload:'<path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>',
   trash:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14M10 11v6M14 11v6"/>',
+  ladder:'<path d="M7 3v18M17 3v18M7 8h10M7 13h10M7 18h10"/>',
   cart:'<circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"/>',
   send:'<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/>',
   edit:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
@@ -1064,13 +1088,53 @@ function weekStatus(w){
 }
 function weekBar(){
   const L=weekList(),w=VW(),i=L.indexOf(w),st=weekStatus(w);
-  const nm=w===state.week?"Week of "+fmtDate(w.start):(w.label||"Week of "+fmtDate(w.start));
+  const nm=w===state.week?"Week of "+shortD(w.start):weekRange(w);
   return '<div class="wkbar'+(isPast()?" past":"")+'"><button class="wkarr" data-act="week-step" data-id="1"'+(i>=L.length-1?" disabled":"")+' aria-label="Older week">'+ic("back",18)+'</button><button class="wkname" data-act="week-pick"><b>'+esc(nm)+' <i class="caret">&#9662;</i></b><span class="wkst '+st.cls+'">'+esc(st.txt)+'</span></button><button class="wkarr fwd" data-act="week-step" data-id="-1"'+(i<=0?" disabled":"")+' aria-label="Newer week">'+ic("back",18)+"</button></div>"+
     (isPast()?'<div class="pastbar"><span>Viewing a past week. Changes count toward that week.</span><button class="btn sm" data-act="week-go" data-id="">Back to this week</button></div>':"");
 }
+// short week names: "Nov 18 - 21", "Nov 29 - Dec 3", with the year only when it is not this year
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const shortD=iso=>{const d=parseISO(iso);return MON[d.getMonth()]+" "+d.getDate()};
+function weekRange(w){
+  if(!w.end)return "Week of "+shortD(w.start);
+  const a=parseISO(w.start),b=parseISO(w.end),yr=b.getFullYear()!==new Date().getFullYear()?", "+b.getFullYear():"";
+  return shortD(w.start)+" - "+(a.getMonth()===b.getMonth()?b.getDate():shortD(w.end))+yr;
+}
+// pick a week: this week pinned on top, older weeks by month, filters for what still needs attention, and a search
+// that also finds the week a slab is in by its cert or name
 function weekPicker(){
-  const el=modal('<h2>Choose a week</h2><div class="wklist">'+weekList().map(w=>{const st=weekStatus(w),t=calc(w),on=w===VW();
-    return '<button class="wkrow'+(on?" on":"")+'" data-act="week-go" data-id="'+(w===state.week?"":w.id)+'"><div class="main"><b>'+esc(w===state.week?"Week of "+fmtDate(w.start):w.label)+'</b><small>'+fmtDate(w.start)+(w.end?" - "+fmtDate(w.end):" - now")+" | "+plural(w.cards.length,"card")+'</small><span class="wkst '+st.cls+'">'+esc(st.txt)+'</span></div><div class="amt"><b class="'+(t.soldProfit<0?"neg":"")+'">'+money(t.soldProfit)+"</b><small>sold profit</small></div></button>"}).join("")+'</div><div class="actions"><button class="btn sec" data-act="close-modal">Close</button></div>');
+  let f=ui.wkf||"all",qy="";
+  const rows=weekList().map(w=>{const st=weekStatus(w);return{w,st,t:calc(w),need:st.cls==="sell"||st.cls==="owed"}});
+  const old=rows.filter(r=>r.w!==state.week),nNeed=old.filter(r=>r.need).length;
+  const el=modal('<h2>Choose a week</h2><div class="wkctl"><input id="wkq" type="search" placeholder="Search a date, card name or cert" autocomplete="off"><div class="chips" id="wkf"></div></div><div class="wklist" id="wkl"></div><div class="actions"><button class="btn sec" data-act="close-modal">Close</button></div>');
+  const hit=(r,q)=>{
+    if(!q)return{ok:true};
+    const words=[weekRange(r.w),r.w.label||"",fmtDate(r.w.start),fmtDate(r.w.end),MON[parseISO(r.w.start).getMonth()],r.st.txt].join(" ").toLowerCase();
+    if(words.includes(q))return{ok:true};
+    const c=r.w.cards.find(c=>String(c.cert||"").includes(q)||String(c.desc||"").toLowerCase().includes(q));
+    return c?{ok:true,card:c}:{ok:false};
+  };
+  const row=(r,h)=>{const on=r.w===VW(),cur=r.w===state.week;
+    return '<button class="wkrow'+(on?" on":"")+'" data-act="week-go" data-id="'+(cur?"":r.w.id)+'"><div class="main"><b>'+esc(cur?"This week":weekRange(r.w))+'</b><small>'+(cur?"Since "+shortD(r.w.start)+" | ":"")+plural(r.w.cards.length,"slab")+" | "+r.t.soldN+" sold"+'</small>'+(h.card?'<small class="wkfound">'+ic("search",12)+esc((h.card.desc||"Cert "+h.card.cert).slice(0,60))+"</small>":"")+(cur?"":'<span class="wkst '+r.st.cls+'">'+esc(r.st.txt)+"</span>")+'</div><div class="amt"><b class="'+(r.t.soldProfit<0?"neg":"")+'">'+money(r.t.soldProfit)+"</b><small>sold profit</small></div></button>"};
+  const draw=()=>{
+    $("#wkf",el).innerHTML=[["all","All",old.length],["need","Needs attention",nNeed],["done","Settled",old.length-nNeed]].map(([k,t,n])=>'<button class="chip'+(f===k?" on":"")+'" data-wf="'+k+'" type="button">'+t+" <i>"+n+"</i></button>").join("");
+    let h="";const cur=rows[0],ch=hit(cur,qy);
+    if(ch.ok&&f==="all")h+='<div class="wkmonth">Now</div>'+row(cur,ch);
+    let month="",shown=0;
+    old.forEach(r=>{
+      if(f==="need"&&!r.need||f==="done"&&r.need)return;
+      const m=hit(r,qy);if(!m.ok)return;
+      const d=parseISO(r.w.start),key=MON[d.getMonth()]+" "+d.getFullYear();
+      if(key!==month){month=key;const inM=old.filter(x=>{const y=parseISO(x.w.start);return MON[y.getMonth()]+" "+y.getFullYear()===key});h+='<div class="wkmonth">'+esc(["January","February","March","April","May","June","July","August","September","October","November","December"][d.getMonth()]+" "+d.getFullYear())+"<span>"+plural(inM.length,"week")+" | "+money(round2(sum(inM,x=>x.t.soldProfit)))+" profit</span></div>"}
+      h+=row(r,m);shown++;
+    });
+    if(!shown&&!(ch.ok&&f==="all"))h+='<p class="hint center" style="margin:24px 0">'+(qy?"Nothing matches “"+esc(qy)+"”":f==="need"?"Every past week is settled":"No past weeks yet")+"</p>";
+    $("#wkl",el).innerHTML=h;
+  };
+  $("#wkf",el).addEventListener("click",e=>{const b=e.target.closest("[data-wf]");if(!b)return;f=ui.wkf=b.dataset.wf;draw()});
+  $("#wkq",el).addEventListener("input",e=>{qy=e.target.value.trim().toLowerCase();draw()});
+  draw();
+  const on=$("#wkl .wkrow.on",el);if(on)on.scrollIntoView({block:"center"});
   return el;
 }
 function dueBanner(){
@@ -1176,7 +1240,7 @@ function cardsView(){
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
   return (isPast()?"":'<div id="qbox">'+queueBox()+"</div>")+(ui.filter==="sold"?soldHero(cs):'<div class="hero compact">'+(ui.filter==="all"||!ui.filter?mvPair(isPast()?"Total that week":"Total this week",round2(sum(cs,c=>c.mv)),round2(sum(cs,payoutOf)),"Unsold: market "+money(t.mv)+" | after % "+money(t.due)):filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
-  (isPast()?'<div class="quick inline"><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import what sold</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sell-scan">'+ic("cart")+'Scan to sell</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import CSV</button></div>").replace('<div class="quick">','<div class="quick inline">'))+
+  (isPast()?'<div class="quick inline"><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import what sold</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sell-scan">'+ic("cart")+'Scan to sell</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+'Import CSV</button><button class="qbtn" data-act="pricer">'+ic("ladder")+"Card Ladder</button></div>").replace('<div class="quick">','<div class="quick inline">'))+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.filter(c=>c[0]!=="flag"||ui.filter==="flag"||cs.some(x=>statusOk(x,"flag"))).map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
   '<div class="minis"><select class="mini" id="sortsel" aria-label="Sort">'+opt("new","Newest first",ui.sort)+opt("value","Highest value",ui.sort)+opt("low","Lowest value",ui.sort)+opt("name","Name A-Z",ui.sort)+opt("age","Longest in stock",ui.sort)+'</select><select class="mini" id="ownersel" aria-label="Owner">'+opt("","All owners",ui.owner)+opt(P[0],P[0],ui.owner)+opt(P[1],P[1],ui.owner)+opt("Shared","Shared",ui.owner)+"</select></div>"+
@@ -2282,6 +2346,61 @@ function importChooser(){
     if(r){ui.importMode=mode;ui.importRepacker=r.dataset.rp;closeModal();$("#csvin").value="";$("#csvin").click()}
   });
 }
+// ---------- Card Ladder requests ----------
+// a computer with Card Ladder open in Chrome runs the pricer script (see SETUP.md). Anyone can ask it here to fill in
+// values for this week's unsold slabs; it writes them straight to the cards, and this sheet shows its progress.
+const ago=sec=>sec<60?"just now":sec<3600?Math.round(sec/60)+" min ago":sec<86400?Math.round(sec/3600)+" h ago":Math.round(sec/86400)+" days ago";
+function pricerModal(){
+  if(!state.hasPricer){toast("Run upgrade-7.sql in Supabase first, then try again");return}
+  if(isOffline()){toast("Card Ladder requests need signal");return}
+  const cs=state.week.cards.filter(c=>c.cert&&!c.sold),miss=cs.filter(c=>!(+c.mv>0)).length;
+  let scope=miss?"missing":"all",row=null,busy=false;
+  const el=modal('<h2>Card Ladder values</h2><div id="prst" class="prline off"><i></i><span>Checking the pricer computer...</span></div><div id="prbody"></div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Close</button></div>');
+  const age=()=>row&&row.last_seen?(Date.now()-new Date(row.last_seen).getTime())/1000:Infinity;
+  const running=()=>row&&(row.status==="pending"||row.status==="working")&&!(row.status==="working"&&age()>180);
+  const draw=()=>{
+    if(!el.isConnected)return;
+    const a=age(),on=a<90,st=$("#prst",el);
+    st.className="prline "+(on?"on":"off");
+    st.querySelector("span").textContent=on?"Pricer computer is on"+(row.worker?" ("+row.worker+")":""):row&&row.last_seen?"Pricer computer is off. Last seen "+ago(a)+".":"No pricer computer set up yet. See SETUP.md, version 48.";
+    const b=$("#prbody",el);let h="";
+    if(running()){
+      const pct=row.total?Math.round(row.progress/row.total*100):0;
+      h=row.status==="pending"?'<p class="hint">'+esc(row.requested_by||"Someone")+" asked "+ago((Date.now()-new Date(row.requested_at).getTime())/1000)+". "+(on?"Starting...":"It starts when the computer is on.")+"</p>":
+        '<p class="hint" style="margin:0">Pricing '+row.progress+" of "+row.total+(row.current_card?": "+esc(row.current_card):"")+'</p><div class="prbar"><b style="width:'+pct+'%"></b></div><p class="hint">Values show up in Cards as they are saved.</p>';
+      h+='<button class="btn sec block" id="prstop" type="button">Stop</button>';
+    }else{
+      if(row&&(row.status==="done"||row.status==="error")&&row.finished_at)h+=lastRun();
+      h+='<div class="menu" id="prscope">'+[["missing","Only slabs with no value",miss],["all","All unsold slabs in this week",cs.length]].map(([k,t,n])=>'<button class="mi'+(scope===k?" on":"")+'" data-sc="'+k+'" type="button">'+ic(scope===k?"check":"ladder")+'<span class="mt">'+t+"<small>"+plural(n,"slab")+"</small></span></button>").join("")+"</div>";
+      const n=scope==="missing"?miss:cs.length;
+      h+='<button class="btn block" id="prgo" type="button"'+(n&&!busy?"":" disabled")+">"+(n?"Price "+plural(n,"slab"):"Nothing to price")+"</button>"+(on||!n?"":'<p class="hint center">The computer is off, so this waits until it is back on.</p>');
+    }
+    b.innerHTML=h;
+  };
+  const lastRun=()=>{
+    const r=row.result||{},when=ago((Date.now()-new Date(row.finished_at).getTime())/1000);
+    if(row.status==="error")return '<div class="cardbox" style="margin-bottom:12px"><b>Last request stopped '+when+"</b><p class=\"hint\" style=\"margin:4px 0 0\">"+esc(row.message||"Something went wrong on the pricer computer.")+"</p></div>";
+    const fl=r.flagged||[],nf=r.notFound||[];
+    return '<div class="cardbox" style="margin-bottom:12px"><b>Last request, '+when+(row.requested_by?" by "+esc(row.requested_by):"")+'</b><p class="hint" style="margin:4px 0 6px">'+plural(r.updated||0,"value")+" updated"+(r.same?" | "+r.same+" unchanged":"")+(nf.length?" | "+nf.length+" not on Card Ladder":"")+(row.message?" | "+esc(row.message):"")+"</p>"+
+      (fl.length?'<p class="hint" style="margin:0"><b>Recent sales 25% or more off the Card Ladder value:</b></p><table class="prflag"><tr><td></td><td>CL</td><td>Last 3</td><td></td></tr>'+fl.map(f=>"<tr><td>"+esc(f.name||"Cert "+f.cert)+"</td><td>"+money(f.cl)+"</td><td>"+money(f.avg3)+'</td><td class="'+(f.off<0?"neg":"")+'">'+(f.off>0?"+":"")+f.off+"%</td></tr>").join("")+"</table>":"")+
+      (nf.length?'<p class="hint" style="margin:4px 0 0">Not found: '+nf.map(esc).join(", ")+"</p>":"")+"</div>";
+  };
+  const load=async()=>{
+    if(!el.isConnected){clearInterval(timer);return}
+    try{const r=await sb.from("pricer").select("*").eq("id",1).maybeSingle();if(!r.error){row=r.data;draw()}}catch(e){}
+  };
+  el.addEventListener("click",async e=>{
+    const sc=e.target.closest("[data-sc]");if(sc){scope=sc.dataset.sc;draw();return}
+    if(e.target.closest("#prgo")){
+      busy=true;draw();
+      const ok=await api(sb.from("pricer").update({status:"pending",scope,requested_by:me.name,requested_at:new Date().toISOString(),started_at:null,finished_at:null,progress:0,total:0,current_card:null,message:null,result:null}).eq("id",1));
+      busy=false;if(ok){toast("Sent to the pricer computer");await load()}else draw();
+      return;
+    }
+    if(e.target.closest("#prstop")){if(await api(sb.from("pricer").update({status:"error",message:"Stopped by "+me.name,finished_at:new Date().toISOString(),current_card:null}).eq("id",1)))await load()}
+  });
+  draw();load();const timer=setInterval(load,4000);
+}
 // ---------- Card Ladder bridge ----------
 // lets the Card Ladder pricer (Claude in Chrome, on a computer where this app is open and signed in)
 // read which slabs need a value and write CL values straight back, saved like a normal edit
@@ -2598,6 +2717,7 @@ const actions={
   bulk(){bulkModal()},
   "scan-certs"(){scanModal()},
   "sell-scan"(){scanModal("sell")},
+  pricer(){pricerModal()},
   "import-csv"(){importChooser()},
   "sel-repack"(){repackBulkModal()},
   "add-entry"(id,t){entryModal(t.dataset.kind,null,t.dataset.week||null)},
