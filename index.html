@@ -792,7 +792,7 @@ function conflictsModal(){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=49;
+const APP_VERSION=50;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -2484,13 +2484,16 @@ async function importLastPack(text){
   const iC=col("cert"),iSec=col("section"),iV=col("value")>=0?col("value"):col("claim_value"),iN=col("card"),iG=col("grade"),iD=col("submitted_at"),iSt=col("status");
   const rpName=(state.settings.repackers||[]).find(n=>/last/i.test(n))||"LastPack";
   const all=[state.week,...state.history];
-  const localDay=v=>{const d=new Date(v);return isNaN(d)?todayISO():isoOf(d)};
+  const localDay=v=>{const d=new Date(v);return isNaN(d)?"":isoOf(d)};
+  // only rows LastPack dated inside the week being viewed (this week runs from its start to today)
+  const W=VW(),from=W.start,to=W===state.week||!W.end?todayISO():W.end,wkName=W===state.week?"this week ("+shortD(from)+" - "+shortD(to)+")":weekRange(W);
   const words=t=>new Set(String(t||"").toLowerCase().match(/[a-z]{4,}/g)||[]);
-  const seen=new Set(),hits=[],already=[],missing=[],other=[];
+  const seen=new Set(),items=[];
   rows.slice(1).forEach(r=>{
     const cert=normalizeCert(g(r,iC));if(!cert||seen.has(cert))return;seen.add(cert);
-    const item={cert,value:parseMoney(g(r,iV)),name:g(r,iN),grade:g(r,iG).replace(/^g/i,"PSA "),date:localDay(g(r,iD)),section:g(r,iSec)};
-    if(!/approv/i.test(item.section)||/reject|declin|return/i.test(g(r,iSt))){other.push(item);return}
+    const date=localDay(g(r,iD));
+    const item={cert,value:parseMoney(g(r,iV)),name:g(r,iN),grade:g(r,iG).replace(/^g/i,"PSA "),date:date||todayISO(),section:g(r,iSec),inRange:!!date&&date>=from&&date<=to};
+    if(!/approv/i.test(item.section)||/reject|declin|return/i.test(g(r,iSt))){item.kind="other";items.push(item);return}
     let found=null,wk=null;
     for(const w of all){const c=w.cards.find(x=>x.cert===cert);if(c){found=c;wk=w;break}}
     // a cert the scanner misread: the app has part of it (e.g. 871237 for 79871237) on the same card
@@ -2498,37 +2501,45 @@ async function importLastPack(text){
       const cand=[];all.forEach(w=>w.cards.forEach(c=>{const a=String(c.cert||"");if(!c.sold&&a.length>=6&&a!==cert&&cert.includes(a)){const wa=words(c.desc),wb=words(item.name);if([...wa].some(x=>wb.has(x)))cand.push({c,w})}}));
       if(cand.length===1){found=cand[0].c;wk=cand[0].w;item.fixCert=String(found.cert)}
     }
-    if(!found){missing.push(item);return}
-    if(found.sold)already.push(Object.assign(item,{c:found,w:wk}));else hits.push(Object.assign(item,{c:found,w:wk}));
+    if(!found){item.kind="missing";items.push(item);return}
+    items.push(Object.assign(item,{c:found,w:wk,kind:found.sold?"already":"hit"}));
   });
-  let rate=(()=>{try{return +localStorage.getItem("repack-lp-rate")||92}catch(e){return 92}})();
+  let rate=(()=>{try{return +localStorage.getItem("repack-lp-rate")||92}catch(e){return 92}})(),allDates=false;
   const pay=v=>round2(v*rate/100);
-  const fixable=()=>already.filter(a=>Math.abs((+a.c.soldPrice||0)-pay(a.value))>=0.01);
-  const weeks=[...new Set(hits.map(h=>h.w===state.week?"this week":weekRange(h.w)))];
-  const el=modal('<h2>LastPack claims</h2><div class="counts"><div><b>'+hits.length+'</b><span>to mark sold</span></div><div><b>'+already.length+'</b><span>already sold</span></div><div><b>'+missing.length+'</b><span>not in the app</span></div></div>'+
+  const pick=k=>items.filter(x=>x.kind===k&&(allDates||x.inRange));
+  const outside=()=>items.filter(x=>!x.inRange).length;
+  const fixable=()=>pick("already").filter(a=>Math.abs((+a.c.soldPrice||0)-pay(a.value))>=0.01);
+  const el=modal('<h2>LastPack claims</h2><p class="hint" id="lpwhen"></p><div class="counts" id="lpcounts"></div>'+
     field("LastPack paid (% of value)",'<input id="lprate" type="number" step="any" inputmode="decimal" value="'+rate+'">')+
-    '<div class="preview" id="lpsum"></div>'+
-    (weeks.length?'<p class="hint">Marked sold in '+esc(weeks.join(", "))+", on the day LastPack approved each one, with "+esc(rpName)+" as the repacker.</p>":"")+
-    (hits.some(h=>h.fixCert)?'<p class="hint"><b>Cert fixed:</b> '+hits.filter(h=>h.fixCert).map(h=>esc(h.fixCert+" → "+h.cert+" ("+(h.c.desc||h.name).slice(0,40)+")")).join("<br>")+"</p>":"")+
+    '<div class="preview" id="lpsum"></div><div id="lpinfo"></div>'+
+    '<label class="chk" id="lpallw"><input type="checkbox" id="lpall"><span id="lpallt"></span></label>'+
     '<label class="chk" id="lpfixw"><input type="checkbox" id="lpfix"><span id="lpfixt"></span></label>'+
-    (missing.length?'<details class="sdmiss"><summary>'+plural(missing.length,"cert")+' not in the app (left alone)</summary><p class="hint">'+missing.map(m=>esc(m.cert+" "+m.name.slice(0,50)+" | "+money(m.value))).join("<br>")+"</p></details>":"")+
-    (other.length?'<details class="sdmiss"><summary>'+plural(other.length,"row")+' not under an approved section (left alone)</summary><p class="hint">'+other.map(m=>esc(m.cert+" "+m.name.slice(0,40)+" | "+m.section)).join("<br>")+"</p></details>":"")+
+    '<div id="lplists"></div>'+
     '<div class="actions"><button class="btn" id="lpgo" type="button">Save</button><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
   const paint=()=>{
-    const v=round2(sum(hits,h=>h.value)),p=round2(sum(hits,h=>pay(h.value))),f=fixable();
+    const hits=pick("hit"),already=pick("already"),missing=pick("missing"),other=pick("other"),f=fixable(),out=outside();
+    $("#lpwhen",el).textContent=allDates?"Every row in the file, any date.":"Only rows LastPack dated in "+wkName+"."+(out?" "+plural(out,"row")+" from other dates "+(out===1?"is":"are")+" skipped.":"");
+    $("#lpcounts",el).innerHTML='<div><b>'+hits.length+'</b><span>to mark sold</span></div><div><b>'+already.length+'</b><span>already sold</span></div><div><b>'+missing.length+'</b><span>not in the app</span></div>';
+    const v=round2(sum(hits,h=>h.value)),p=round2(sum(hits,h=>pay(h.value)));
     $("#lpsum",el).textContent=hits.length?"LastPack paid "+money(p)+" for "+plural(hits.length,"slab")+" ("+money(v)+" value at "+rate+"%)":"Nothing new to mark sold";
+    const wks=[...new Set(hits.map(h=>h.w===state.week?"this week":weekRange(h.w)))],fx=hits.filter(h=>h.fixCert);
+    $("#lpinfo",el).innerHTML=(wks.length?'<p class="hint">Marked sold in '+esc(wks.join(", "))+", on the day LastPack approved each one, with "+esc(rpName)+" as the repacker.</p>":"")+
+      (fx.length?'<p class="hint"><b>Cert fixed:</b> '+fx.map(h=>esc(h.fixCert+" → "+h.cert+" ("+(h.c.desc||h.name).slice(0,40)+")")).join("<br>")+"</p>":"");
+    $("#lpallw",el).hidden=!out&&!allDates;$("#lpallt",el).textContent="Include all "+plural(items.length,"row")+", not just this week's dates";
     $("#lpfixw",el).hidden=!f.length;$("#lpfixt",el).textContent="Also set the sale price on "+plural(f.length,"slab")+" already marked sold to "+rate+"% of LastPack's value";
-    $("#lpgo",el).disabled=!(hits.length||(f.length&&$("#lpfix",el).checked));
-    $("#lpgo",el).textContent=hits.length?"Mark "+plural(hits.length,"slab")+" sold":"Update sale prices";
+    $("#lplists",el).innerHTML=(missing.length?'<details class="sdmiss"><summary>'+plural(missing.length,"cert")+' not in the app (left alone)</summary><p class="hint">'+missing.map(m=>esc(m.cert+" "+m.name.slice(0,50)+" | "+money(m.value))).join("<br>")+"</p></details>":"")+
+      (other.length?'<details class="sdmiss"><summary>'+plural(other.length,"row")+' not under an approved section (left alone)</summary><p class="hint">'+other.map(m=>esc(m.cert+" "+m.name.slice(0,40)+" | "+m.section)).join("<br>")+"</p></details>":"");
+    const go=$("#lpgo",el);go.disabled=!(hits.length||(f.length&&$("#lpfix",el).checked));go.textContent=hits.length?"Mark "+plural(hits.length,"slab")+" sold":"Update sale prices";
   };
   $("#lprate",el).addEventListener("input",e=>{rate=+e.target.value||0;paint()});
+  $("#lpall",el).addEventListener("change",e=>{allDates=e.target.checked;paint()});
   $("#lpfix",el).addEventListener("change",paint);paint();
   $("#lpgo",el).addEventListener("click",async()=>{
     if(!(rate>0&&rate<=100)){toast("Enter LastPack's % between 1 and 100");return}
     try{localStorage.setItem("repack-lp-rate",String(rate))}catch(e){}
     el.querySelectorAll("button").forEach(b=>b.disabled=true);$("#lpgo",el).textContent="Saving...";
     const rp=h=>state.hasRepack?Object.assign({repack_status:"accepted",repack_date:h.date},state.hasRepacker?{repacker:rpName}:{}):{};
-    const jobs=hits.map(h=>({id:h.c.id,patch:Object.assign({sold:true,sale_type:"sold",sold_price:pay(h.value),sold_date:h.date,trade_cash:null,market_value:h.value,consignor_pct:rate},h.fixCert?{cert:h.cert}:{},!String(h.c.desc||"").trim()&&h.name?{description:h.name+(h.grade?" "+h.grade:"")}:{},rp(h))}));
+    const jobs=pick("hit").map(h=>({id:h.c.id,patch:Object.assign({sold:true,sale_type:"sold",sold_price:pay(h.value),sold_date:h.date,trade_cash:null,market_value:h.value,consignor_pct:rate},h.fixCert?{cert:h.cert}:{},!String(h.c.desc||"").trim()&&h.name?{description:h.name+(h.grade?" "+h.grade:"")}:{},rp(h))}));
     if($("#lpfix",el).checked)fixable().forEach(a=>jobs.push({id:a.c.id,patch:Object.assign({sold_price:pay(a.value),market_value:a.value,consignor_pct:rate},rp(a))}));
     let ok=0;
     for(let k=0;k<jobs.length;k+=8){const rs=await Promise.all(jobs.slice(k,k+8).map(j=>api(sb.from("cards").update(j.patch).eq("id",j.id))));ok+=rs.filter(Boolean).length}
