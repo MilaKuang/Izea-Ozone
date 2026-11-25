@@ -792,7 +792,7 @@ function conflictsModal(){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=48;
+const APP_VERSION=49;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -2333,7 +2333,7 @@ function passwordModal(){
 // ---------- csv import ----------
 function importChooser(){
   const reps=state.settings.repackers;
-  const el=modal('<h2>Import CSV</h2><div id="ic1"><div class="menu"><button class="mi" data-m="sold" type="button">'+ic("cart")+'<span class="mt">What sold<small>Marks the slabs in the file as sold, with their sale prices if the file has them</small></span><span class="chev">'+ic("open",18)+'</span></button>'+(isPast()?"":'<button class="mi" data-m="new" type="button">'+ic("plus")+'<span class="mt">New cards we got<small>Adds cards from a repacker export or any list of certs</small></span><span class="chev">'+ic("open",18)+'</span></button>')+(isPast()?"":'<button class="mi" data-m="triumph" type="button">'+ic("check")+'<span class="mt">What a repacker accepted<small>Marks matching cards as accepted, pending or rejected. Adds nothing unless you choose to.</small></span><span class="chev">'+ic("open",18)+'</span></button>')+'</div></div><div id="ic2" hidden><p class="hint" id="ic2t"></p><div class="menu">'+reps.map(n=>'<button class="mi" data-rp="'+esc(n)+'" type="button">'+ic("layers")+'<span class="mt">'+esc(n)+'</span><span class="chev">'+ic("open",18)+"</span></button>").join("")+'<button class="mi" data-rp="" id="icnone" type="button">'+ic("upload")+'<span class="mt">Not from a repacker<small>Just a list of cards we got</small></span><span class="chev">'+ic("open",18)+'</span></button></div></div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  const el=modal('<h2>Import CSV</h2><div id="ic1"><div class="menu"><button class="mi" data-m="sold" type="button">'+ic("cart")+'<span class="mt">What sold<small>Marks the slabs in the file as sold, with their sale prices if the file has them. Also reads the LastPack claims export.</small></span><span class="chev">'+ic("open",18)+'</span></button>'+(isPast()?"":'<button class="mi" data-m="new" type="button">'+ic("plus")+'<span class="mt">New cards we got<small>Adds cards from a repacker export or any list of certs</small></span><span class="chev">'+ic("open",18)+'</span></button>')+(isPast()?"":'<button class="mi" data-m="triumph" type="button">'+ic("check")+'<span class="mt">What a repacker accepted<small>Marks matching cards as accepted, pending or rejected. Adds nothing unless you choose to.</small></span><span class="chev">'+ic("open",18)+'</span></button>')+'</div></div><div id="ic2" hidden><p class="hint" id="ic2t"></p><div class="menu">'+reps.map(n=>'<button class="mi" data-rp="'+esc(n)+'" type="button">'+ic("layers")+'<span class="mt">'+esc(n)+'</span><span class="chev">'+ic("open",18)+"</span></button>").join("")+'<button class="mi" data-rp="" id="icnone" type="button">'+ic("upload")+'<span class="mt">Not from a repacker<small>Just a list of cards we got</small></span><span class="chev">'+ic("open",18)+'</span></button></div></div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
   let mode="";
   el.addEventListener("click",e=>{
     const m=e.target.closest("[data-m]");
@@ -2473,6 +2473,66 @@ async function importTriumphStatus(text){
       for(let k=0;k<rowsNew.length;k+=300){if(await api(sb.from("cards").upsert(rowsNew.slice(k,k+300),{onConflict:"week_id,cert",ignoreDuplicates:true})))added+=Math.min(300,rowsNew.length-k)}
     }
     closeModal();await refreshRender();toast(ok+" updated"+(added?", "+added+" added":""));
+  });
+}
+// LastPack's "my consignment claims" export: submitted_at, section, cert, card, grade, value, ...
+// Rows under an APPROVED section are slabs LastPack paid for: each is marked sold at value x LastPack's rate.
+const isLastPack=text=>{const h=(String(text).split(/\r?\n/)[0]||"").toLowerCase();return /\bsection\b/.test(h)&&/\bcert\b/.test(h)&&/\bvalue\b/.test(h)&&/submitted_at|claim_value/.test(h)};
+async function importLastPack(text){
+  const rows=parseCSV(text);if(rows.length<2){toast("That file looks empty");return}
+  const H=rows[0].map(h=>String(h).trim().toLowerCase()),col=k=>H.indexOf(k),g=(r,i)=>i>=0&&i<r.length?String(r[i]).trim():"";
+  const iC=col("cert"),iSec=col("section"),iV=col("value")>=0?col("value"):col("claim_value"),iN=col("card"),iG=col("grade"),iD=col("submitted_at"),iSt=col("status");
+  const rpName=(state.settings.repackers||[]).find(n=>/last/i.test(n))||"LastPack";
+  const all=[state.week,...state.history];
+  const localDay=v=>{const d=new Date(v);return isNaN(d)?todayISO():isoOf(d)};
+  const words=t=>new Set(String(t||"").toLowerCase().match(/[a-z]{4,}/g)||[]);
+  const seen=new Set(),hits=[],already=[],missing=[],other=[];
+  rows.slice(1).forEach(r=>{
+    const cert=normalizeCert(g(r,iC));if(!cert||seen.has(cert))return;seen.add(cert);
+    const item={cert,value:parseMoney(g(r,iV)),name:g(r,iN),grade:g(r,iG).replace(/^g/i,"PSA "),date:localDay(g(r,iD)),section:g(r,iSec)};
+    if(!/approv/i.test(item.section)||/reject|declin|return/i.test(g(r,iSt))){other.push(item);return}
+    let found=null,wk=null;
+    for(const w of all){const c=w.cards.find(x=>x.cert===cert);if(c){found=c;wk=w;break}}
+    // a cert the scanner misread: the app has part of it (e.g. 871237 for 79871237) on the same card
+    if(!found){
+      const cand=[];all.forEach(w=>w.cards.forEach(c=>{const a=String(c.cert||"");if(!c.sold&&a.length>=6&&a!==cert&&cert.includes(a)){const wa=words(c.desc),wb=words(item.name);if([...wa].some(x=>wb.has(x)))cand.push({c,w})}}));
+      if(cand.length===1){found=cand[0].c;wk=cand[0].w;item.fixCert=String(found.cert)}
+    }
+    if(!found){missing.push(item);return}
+    if(found.sold)already.push(Object.assign(item,{c:found,w:wk}));else hits.push(Object.assign(item,{c:found,w:wk}));
+  });
+  let rate=(()=>{try{return +localStorage.getItem("repack-lp-rate")||92}catch(e){return 92}})();
+  const pay=v=>round2(v*rate/100);
+  const fixable=()=>already.filter(a=>Math.abs((+a.c.soldPrice||0)-pay(a.value))>=0.01);
+  const weeks=[...new Set(hits.map(h=>h.w===state.week?"this week":weekRange(h.w)))];
+  const el=modal('<h2>LastPack claims</h2><div class="counts"><div><b>'+hits.length+'</b><span>to mark sold</span></div><div><b>'+already.length+'</b><span>already sold</span></div><div><b>'+missing.length+'</b><span>not in the app</span></div></div>'+
+    field("LastPack paid (% of value)",'<input id="lprate" type="number" step="any" inputmode="decimal" value="'+rate+'">')+
+    '<div class="preview" id="lpsum"></div>'+
+    (weeks.length?'<p class="hint">Marked sold in '+esc(weeks.join(", "))+", on the day LastPack approved each one, with "+esc(rpName)+" as the repacker.</p>":"")+
+    (hits.some(h=>h.fixCert)?'<p class="hint"><b>Cert fixed:</b> '+hits.filter(h=>h.fixCert).map(h=>esc(h.fixCert+" → "+h.cert+" ("+(h.c.desc||h.name).slice(0,40)+")")).join("<br>")+"</p>":"")+
+    '<label class="chk" id="lpfixw"><input type="checkbox" id="lpfix"><span id="lpfixt"></span></label>'+
+    (missing.length?'<details class="sdmiss"><summary>'+plural(missing.length,"cert")+' not in the app (left alone)</summary><p class="hint">'+missing.map(m=>esc(m.cert+" "+m.name.slice(0,50)+" | "+money(m.value))).join("<br>")+"</p></details>":"")+
+    (other.length?'<details class="sdmiss"><summary>'+plural(other.length,"row")+' not under an approved section (left alone)</summary><p class="hint">'+other.map(m=>esc(m.cert+" "+m.name.slice(0,40)+" | "+m.section)).join("<br>")+"</p></details>":"")+
+    '<div class="actions"><button class="btn" id="lpgo" type="button">Save</button><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  const paint=()=>{
+    const v=round2(sum(hits,h=>h.value)),p=round2(sum(hits,h=>pay(h.value))),f=fixable();
+    $("#lpsum",el).textContent=hits.length?"LastPack paid "+money(p)+" for "+plural(hits.length,"slab")+" ("+money(v)+" value at "+rate+"%)":"Nothing new to mark sold";
+    $("#lpfixw",el).hidden=!f.length;$("#lpfixt",el).textContent="Also set the sale price on "+plural(f.length,"slab")+" already marked sold to "+rate+"% of LastPack's value";
+    $("#lpgo",el).disabled=!(hits.length||(f.length&&$("#lpfix",el).checked));
+    $("#lpgo",el).textContent=hits.length?"Mark "+plural(hits.length,"slab")+" sold":"Update sale prices";
+  };
+  $("#lprate",el).addEventListener("input",e=>{rate=+e.target.value||0;paint()});
+  $("#lpfix",el).addEventListener("change",paint);paint();
+  $("#lpgo",el).addEventListener("click",async()=>{
+    if(!(rate>0&&rate<=100)){toast("Enter LastPack's % between 1 and 100");return}
+    try{localStorage.setItem("repack-lp-rate",String(rate))}catch(e){}
+    el.querySelectorAll("button").forEach(b=>b.disabled=true);$("#lpgo",el).textContent="Saving...";
+    const rp=h=>state.hasRepack?Object.assign({repack_status:"accepted",repack_date:h.date},state.hasRepacker?{repacker:rpName}:{}):{};
+    const jobs=hits.map(h=>({id:h.c.id,patch:Object.assign({sold:true,sale_type:"sold",sold_price:pay(h.value),sold_date:h.date,trade_cash:null,market_value:h.value,consignor_pct:rate},h.fixCert?{cert:h.cert}:{},!String(h.c.desc||"").trim()&&h.name?{description:h.name+(h.grade?" "+h.grade:"")}:{},rp(h))}));
+    if($("#lpfix",el).checked)fixable().forEach(a=>jobs.push({id:a.c.id,patch:Object.assign({sold_price:pay(a.value),market_value:a.value,consignor_pct:rate},rp(a))}));
+    let ok=0;
+    for(let k=0;k<jobs.length;k+=8){const rs=await Promise.all(jobs.slice(k,k+8).map(j=>api(sb.from("cards").update(j.patch).eq("id",j.id))));ok+=rs.filter(Boolean).length}
+    closeModal();await refreshRender();toast("Saved "+plural(ok,"slab")+(ok<jobs.length?" | "+(jobs.length-ok)+" could not be saved":""));
   });
 }
 // "What sold": a CSV with a cert column, and optionally sale price and sold date columns.
@@ -2769,7 +2829,7 @@ function startQuickSelect(id){
 document.addEventListener("click",e=>{if(lpSuppress&&e.target.closest("[data-act]")){lpSuppress=false;e.preventDefault();return}const t=e.target.closest("[data-act]");if(!t)return;const fn=actions[t.dataset.act];if(fn){e.preventDefault();fn(t.dataset.id,t,e)}});
 document.addEventListener("input",e=>{if(e.target.id==="q"){ui.q=e.target.value;paintList()}});
 document.addEventListener("change",e=>{const id=e.target.id;if(id==="sortsel"){ui.sort=e.target.value;try{localStorage.setItem("repack-ui",JSON.stringify({sort:ui.sort}))}catch(x){}render()}else if(id==="ownersel"){ui.owner=e.target.value;render()}});
-$("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const mode=ui.importMode;const r=new FileReader();r.onload=()=>mode==="sold"?importSoldCSV(String(r.result)):mode==="triumph"?importTriumphStatus(String(r.result)):importCSVText(String(r.result));r.readAsText(f)});
+$("#csvin").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const mode=ui.importMode;const r=new FileReader();r.onload=()=>mode!=="new"&&isLastPack(String(r.result))?importLastPack(String(r.result)):mode==="sold"?importSoldCSV(String(r.result)):mode==="triumph"?importTriumphStatus(String(r.result)):importCSVText(String(r.result));r.readAsText(f)});
 let awayAt=0;
 document.addEventListener("visibilitychange",()=>{if(!sb||!me)return;if(document.hidden){awayAt=Date.now();try{pc&&pc.untrack()}catch(e){}lastTrack=""}else{softRefresh();if(awayAt&&Date.now()-awayAt>20000)reconnectLive();else if(pcStatus!=="SUBSCRIBED"||rtStatus!=="SUBSCRIBED")retryLive(true);trackMe(true)}});
 window.addEventListener("online",()=>{if(sb&&me){softRefresh();reconnectLive()}});
