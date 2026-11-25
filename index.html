@@ -762,11 +762,12 @@ async function replayOp(op,cf){
 let syncAllBusy=false;
 async function syncAll(){
   if(syncAllBusy||!sb||!me||!RAW||ui.offline)return;
-  if(!obList().length&&!qList().length)return;
+  if(!obList().length&&!qList().length){flushPhotos();return}
   syncAllBusy=true;
   try{
     const before=cfList().length,n=await syncOutbox();
     await flushQueue(true);
+    flushPhotos();
     const nc=cfList().length-before;
     if(n){toast("Uploaded "+plural(n,"offline change")+(nc?" | "+nc+" need"+(nc===1?"s":"")+" a decision":""));try{RAW=await fetchRaw();rebuild();try{localStorage.setItem(CACHE_KEY,JSON.stringify({me,raw:RAW}))}catch(e){}}catch(e){}if(document.querySelector(".overlay"))ui.dirty=true;else render()}
   }finally{syncAllBusy=false;paintQueue()}
@@ -792,7 +793,7 @@ function conflictsModal(){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=51;
+const APP_VERSION=52;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -1518,7 +1519,7 @@ function scanModal(mode){
     '<div class="fs-msg" id="scmsg" hidden><p>Camera is off. Allow camera access, or use Photo of label or Type a cert.</p><button class="btn sm" id="scretry" type="button">Try camera again</button></div>'+
     '<div class="fs-flash" id="scflash"></div>'+
     '<div class="fs-top"><button class="fs-ib" data-act="close-modal" type="button" aria-label="Close">'+ic("plus",22).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+'</button><h2>'+(sell?"Scan to sell":tw===state.week?"Scan certs":"Scan into "+esc(weekRange(tw)))+'</h2><button class="fs-chip" id="scopt" type="button"'+(sell?" hidden":"")+'></button></div>'+
-    '<div class="fs-extra" id="scopts" hidden><div class="two"><div>'+field("Owner",'<select id="scown">'+owners.map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scauto"'+(autoSnapOn()?" checked":"")+'>Snap by itself when the label is held still</label><label class="chk"><input type="checkbox" id="scocr"'+(ocrOn()?" checked":"")+'>Read the card name from the front label</label><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label><button class="btn block sm" id="scoptok" type="button" style="margin-top:10px">Done</button></div>'+
+    '<div class="fs-extra" id="scopts" hidden><div class="two"><div>'+field("Owner",'<select id="scown">'+owners.map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scauto"'+(autoSnapOn()?" checked":"")+'>Snap by itself when the label is held still</label><label class="chk"><input type="checkbox" id="scocr"'+(ocrOn()?" checked":"")+'>Read the card name from the front label</label><label class="chk"><input type="checkbox" id="sckeep"'+(keepPhotoOn()?" checked":"")+'>Keep a photo of each slab on its card</label><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label><button class="btn block sm" id="scoptok" type="button" style="margin-top:10px">Done</button></div>'+
     '<div class="fs-extra" id="sctype" hidden><div class="certrow"><input id="scin" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="Type a cert number"><button class="btn" id="scadd" type="button">Add</button></div><p class="tiny">A Bluetooth or USB barcode scanner works without opening this.</p></div>'+
     '<input type="file" id="scph" accept="image/*" capture="environment" hidden>'+
     '<div class="fs-panel"><div class="fs-head"><div class="fs-count"><b id="sccount">0</b><span id="scsub">scanned</span></div><button class="fs-snap" id="scvsnap" type="button" aria-label="Snap a photo and read it">'+ic("camera",24)+'</button><div style="text-align:right">'+(sell?'<button class="btn" id="scsell" type="button" disabled>Sell</button>':'<button class="btn" data-act="close-modal" type="button">Done</button>')+'</div></div>'+
@@ -1554,7 +1555,10 @@ function scanModal(mode){
     else{await psaAttach(item.id,r,true);item.title=r.title;item.st="ok"}
     ui.dirty=true;if(el.isConnected)paint();
   })};
-  const add=async(raw,desc)=>{
+  const keepBox=$("#sckeep",el);
+  keepBox.addEventListener("change",e=>{try{localStorage.setItem("repack-keepphoto",e.target.checked?"1":"0")}catch(x){}});
+  const keep=(id,photo)=>{if(id&&photo&&keepBox.checked&&!attachN(id))keepPhoto(id,photo)};
+  const add=async(raw,desc,photo)=>{
     const cert=normalizeCert(raw);if(!cert||pending.has(cert))return;
     if(sell){
       if(picked.some(c=>c.cert===cert)){flash("Already picked "+cert);return}
@@ -1566,6 +1570,7 @@ function scanModal(mode){
     const inSess=session.find(x=>x.cert===cert);
     if(inSess){if(desc&&!inSess.title&&inSess.queued){qUpdate(cert,{desc});inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}if(desc&&!inSess.title&&inSess.id){if(await api(sb.from("cards").update({description:desc}).eq("id",inSess.id))){inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}}flash("Already scanned "+cert);return}
     const ex=tw.cards.find(c=>c.cert===cert);
+    if(ex)keep(ex.id,photo);
     if(ex){if(desc&&!ex.desc){if(await api(sb.from("cards").update({description:desc}).eq("id",ex.id))){ex.desc=desc;ui.dirty=true;beep(true);hit();flash("Name added to "+cert,"ok");return}}beep(false);flash("Already in "+twName+": "+cert,"warn");return}
     const qd=qList().find(x=>x.cert===cert);
     if(qd){if(desc&&!qd.desc){qUpdate(cert,{desc});beep(true);hit();flash("Name added to "+cert,"ok");return}beep(false);flash("Already saved offline: "+cert,"warn");return}
@@ -1575,6 +1580,7 @@ function scanModal(mode){
     const r=await api(sb.from("cards").insert(newCardRow(Object.assign(tw===state.week?{}:{date:tw.end||tw.start},fields),tw.id)).select("id").single());
     pending.delete(cert);
     if(!r){beep(false);return}
+    keep(r.data&&r.data.id,photo);
     if(r.queued){const item={cert,id:r.data&&r.data.id,owner:own.value,title:desc||"",st:"queued",fresh:true};session.unshift(item);ui.dirty=true;beep(true);hit();flash("Saved offline: "+cert+". Uploads when you have signal.","warn");paint();return}
     const item={cert,id:r.data&&r.data.id,owner:own.value,title:desc||"",st:"saved",fresh:true};
     session.unshift(item);ui.dirty=true;beep(true);hit();flash(desc||!ocrBox.checked?"Added "+cert:"Added "+cert+". No name read, scan the front label to add it.","ok");paint();
@@ -1616,7 +1622,7 @@ function scanModal(mode){
   const readName=async cvP=>{if(!ocrBox.checked)return null;try{const cv=await cvP;return cv?await ocrCanvas(cv):null}catch(e){flash("Card name reader could not load","warn");return null}};
   scph.addEventListener("change",async()=>{const file=scph.files[0];if(!file)return;flash(ocrBox.checked?"Reading label...":"Reading photo...");el.classList.add("busy");
     let c=await readBarcodeFromImage(file);const o=await readName(imageCanvas(file,2200));el.classList.remove("busy");
-    if(!c&&o&&o.cert)c=o.cert;if(c)add(c,o&&o.desc);else{beep(false);flash("No cert found in that photo","warn")}});
+    if(!c&&o&&o.cert)c=o.cert;if(c)add(c,o&&o.desc,file);else{beep(false);flash("No cert found in that photo","warn")}});
   let snapping=false;
   const snap=async auto=>{
     if(snapping)return null;if(!vid.srcObject){flash("Camera is off. Use Photo of label.","warn");return null}
@@ -1631,7 +1637,7 @@ function scanModal(mode){
     }finally{el.classList.remove("busy");setTimeout(un,250)}
     snapping=false;
     if(!c&&o&&o.cert)c=o.cert;
-    if(c)add(c,o&&o.desc);else if(auto===true)flash("Could not read it. Hold steady, or tap.","warn");else{beep(false);flash("No cert found. Fit the label in the box and tap again.","warn")}
+    if(c)add(c,o&&o.desc,shot.cv);else if(auto===true)flash("Could not read it. Hold steady, or tap.","warn");else{beep(false);flash("No cert found. Fit the label in the box and tap again.","warn")}
     return c;
   };
   $("#sctap",el).addEventListener("click",()=>snap(false));
@@ -1919,6 +1925,34 @@ async function compressImage(file,quiet){
     return blob;
   }catch(e){if(!quiet)toast("Could not read that photo. Try a different one.");return null}
 }
+// photos kept from scans: shrunk, uploaded in the background, and retried when signal is back
+const keepPhotoOn=()=>{try{return localStorage.getItem("repack-keepphoto")!=="0"}catch(e){return true}};
+const photoQ=[];
+async function keepPhoto(cardId,src){
+  try{
+    let b;
+    if(src instanceof HTMLCanvasElement){const k=Math.min(1,1600/Math.max(src.width,src.height)),cv=document.createElement("canvas");cv.width=Math.round(src.width*k);cv.height=Math.round(src.height*k);cv.getContext("2d").drawImage(src,0,0,cv.width,cv.height);b=await new Promise(r=>cv.toBlob(r,"image/jpeg",0.8))}
+    else b=await compressImage(src,true);
+    if(!b)return;
+    photoQ.push({cardId,b});flushPhotos();
+  }catch(e){}
+}
+let photoBusy=false;
+async function flushPhotos(){
+  if(photoBusy||!photoQ.length||isOffline()||obList().some(o=>o.m==="POST"))return;
+  photoBusy=true;
+  try{
+    while(photoQ.length){
+      const x=photoQ[0],path="cards/"+x.cardId+"/"+uuid()+".jpg";
+      let up;try{up=await sb.storage.from("receipts").upload(path,x.b,{contentType:"image/jpeg"})}catch(e){up={error:e}}
+      if(up&&up.error){if(isNetErr(up.error))break;photoQ.shift();continue}
+      let ins;try{ins=await sb.from("attachments").insert({path,card_id:x.cardId})}catch(e){ins={error:e}}
+      if(ins&&ins.error){if(isNetErr(ins.error)){try{await sb.storage.from("receipts").remove([path])}catch(e){}break}photoQ.shift();try{await sb.storage.from("receipts").remove([path])}catch(e){}continue}
+      photoQ.shift();ui.dirty=true;
+    }
+  }finally{photoBusy=false}
+  if(!photoQ.length&&ui.dirty&&!document.querySelector(".overlay"))refreshRender();
+}
 async function uploadPhotos(kind,entityId,blobs){
   let ok=0;
   for(const b of blobs){
@@ -1971,13 +2005,13 @@ function photoWidget(el,kind,entityId){
     if(t.dataset.pend!==undefined){const [p]=pending.splice(+t.dataset.pend,1);try{URL.revokeObjectURL(p.url)}catch(x){}paint();return}
     const a=attachList(entityId).find(x=>x.id===t.dataset.aid);if(a)openLightbox(a,true,paint);
   });
-  const add=async(files,quiet)=>{for(const f of files){const b=(await compressImage(f,quiet))||(quiet?f:null);if(b)pending.push({blob:b,url:URL.createObjectURL(b)})}paint()};
+  const add=async(files,quiet)=>{for(const f of files){const b=(await compressImage(f,quiet))||(quiet?f:null);if(b)pending.push({blob:b,url:URL.createObjectURL(b)})}paint();if(wd.onAdd&&files.length)wd.onAdd(files)};
   const fc=$("#ph-cam",el),fp=$("#ph-file",el);
   $("#ph-camb",el).addEventListener("click",()=>{fc.value="";fc.click()});
   $("#ph-pickb",el).addEventListener("click",()=>{fp.value="";fp.click()});
   fc.addEventListener("change",()=>add([...fc.files]));fp.addEventListener("change",()=>add([...fp.files]));
   paint();
-  const wd={add,pending,upload:async id=>{const n=await uploadPhotos(kind,id,pending.map(p=>p.blob));pending.length=0;return n}};
+  var wd={add,pending,upload:async id=>{const n=await uploadPhotos(kind,id,pending.map(p=>p.blob));pending.length=0;return n}};
   el.__photo=wd;return wd;
 }
 
@@ -2027,13 +2061,31 @@ function cardModal(id,carry){
       '<div id="tradef" style="display:'+(dsp==="traded"?"block":"none")+'"><div class="two"><div>'+field("Trade value of this card ($)",'<input name="tradeValue" type="number" step="0.01" inputmode="decimal" value="'+esc(dsp==="traded"?d.soldPrice:"")+'">')+"</div><div>"+field("Cash we received ($)",'<input name="tradeCash" type="number" step="0.01" inputmode="decimal" value="'+esc(d.tradeCash)+'">')+"</div></div>"+recvHTML+"</div>"+
       field("Date",'<input type="date" name="soldDate" value="'+esc(d.soldDate)+'">')+splitHTML+
     "</div>"+"</div>"+
-    '<div class="sech"><h3>Photos</h3></div><div class="formbox">'+photoHTML("The buy, the trade, proof of sale")+"</div>"+
+    '<div class="sech"><h3>Photos</h3></div><div class="formbox">'+photoHTML("The slab, the buy, the trade, proof of sale")+'<p class="hint" id="phread" hidden></p>'+(c?"":'<p class="hint">Add a photo of the slab and the app fills in the cert and name for you.</p>')+"</div>"+
     '<div class="sech"><h3>Notes</h3></div><div class="formbox">'+field("Anything to remember",'<input name="notes" value="'+esc(d.notes||"")+'">')+"</div>"+
     (c?'<p class="hint" style="margin-top:12px">'+whoText(c)+"</p>":"")+
     '<div class="actions stick"><button class="btn" type="submit">Save</button>'+(c?"":'<button class="btn sec" type="button" id="savenext">Save + next</button>')+'<button class="btn sec" type="button" data-act="close-modal">Cancel</button>'+(c?'<button class="btn danger ico" type="button" id="delc" aria-label="Delete this card">'+ic("trash")+"</button>":"")+"</div></form>");
   hydrateThumbs(el.querySelector(".ehead"));
   const f=$("#cf",el);
   const ph=photoWidget(el,"cards",id);
+  // a photo of the slab fills in a blank cert and name; the photo stays on the card
+  ph.onAdd=async files=>{
+    if(f.cert.value.trim()&&f.desc.value.trim())return;
+    const tip=$("#phread",el);if(tip){tip.hidden=false;tip.textContent="Reading the photo..."}
+    let cert="",name="";
+    try{
+      for(const file of files){
+        if(!cert)cert=(await readBarcodeFromImage(file))||"";
+        if(ocrOn()&&(!name||!cert)){try{const o=await ocrCanvas(await imageCanvas(file,2200));if(o){if(!cert&&o.cert)cert=o.cert;if(!name&&o.desc)name=o.desc}}catch(e){}}
+        if(cert&&name)break;
+      }
+    }catch(e){}
+    if(!el.isConnected)return;
+    const got=[];
+    if(cert&&!f.cert.value.trim()){f.cert.value=normalizeCert(cert);got.push("cert "+f.cert.value)}
+    if(name&&!f.desc.value.trim()){f.desc.value=name;got.push("name")}
+    if(tip)tip.textContent=got.length?"Filled in the "+got.join(" and ")+" from the photo. Check it before saving.":"Could not read a cert from that photo. The photo is still kept.";
+  };
   wireSeg(el);
   if(f.repack)f.repack.addEventListener("change",()=>{const wv=$("#rpwho",el);if(wv)wv.style.display=f.repack.value?"":"none"});
   f.cert.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"&&f.cert.value.trim()){e.preventDefault();f.cert.value=normalizeCert(f.cert.value);f.desc.focus()}});
