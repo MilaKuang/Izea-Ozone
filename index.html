@@ -792,7 +792,7 @@ function conflictsModal(){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=50;
+const APP_VERSION=51;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -1240,7 +1240,7 @@ function cardsView(){
   const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?" selected":"")+">"+esc(l)+"</option>";
   return (isPast()?"":'<div id="qbox">'+queueBox()+"</div>")+(ui.filter==="sold"?soldHero(cs):'<div class="hero compact">'+(ui.filter==="all"||!ui.filter?mvPair(isPast()?"Total that week":"Total this week",round2(sum(cs,c=>c.mv)),round2(sum(cs,payoutOf)),"Unsold: market "+money(t.mv)+" | after % "+money(t.due)):filterHeroTop(cs,t))+'<div class="hstats c4"><div><span>In stock</span><b>'+t.stockN+'</b></div><div><span>Pending</span><b>'+t.pendN+'</b></div><div><span>Accepted</span><b>'+t.accN+'</b></div><div><span>Sold</span><b>'+t.soldN+"</b></div></div></div>")+
   (ui.sel?'<div class="selhint" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Tap cards to select.</span><span style="display:flex;gap:6px;flex:0 0 auto"><button class="btn sec sm" data-act="sel-all" type="button">Select all</button>'+(state.hasRepack?'<button class="btn sm" data-act="sel-repack" type="button">Repacker</button>':"")+"</span></div>":
-  (isPast()?'<div class="quick inline"><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import what sold</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sell-scan">'+ic("cart")+'Scan to sell</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+'Import CSV</button><button class="qbtn" data-act="pricer">'+ic("ladder")+"Card Ladder</button></div>").replace('<div class="quick">','<div class="quick inline">'))+
+  (isPast()?'<div class="quick inline"><button class="qbtn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="qbtn" data-act="add-card">'+ic("plus")+'Add card</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+"Import what sold</button></div>":'<div class="prow"><button class="btn" data-act="scan-certs">'+ic("scan")+'Scan certs</button><button class="btn sec" data-act="add-card">'+ic("plus")+'Add card</button></div><div class="quick"><button class="qbtn" data-act="bulk">'+ic("layers")+'Bulk certs</button><button class="qbtn" data-act="sell-scan">'+ic("cart")+'Scan to sell</button><button class="qbtn" data-act="sel-mode">'+ic("tag")+'Edit many</button><button class="qbtn" data-act="import-csv">'+ic("upload")+'Import CSV</button><button class="qbtn" data-act="pricer">'+ic("ladder")+"Card Ladder</button></div>").replace('<div class="quick">','<div class="quick inline">'))+
   '<div class="searchw">'+ic("search",18)+'<input class="search" id="q" type="search" placeholder="Search name, cert, owner" value="'+esc(ui.q)+'"></div>'+
   '<div class="chips">'+chips.filter(c=>c[0]!=="flag"||ui.filter==="flag"||cs.some(x=>statusOk(x,"flag"))).map(c=>'<button class="chip '+(ui.filter===c[0]?"on":"")+'" data-act="filter" data-id="'+c[0]+'">'+c[1]+"<i>"+cs.filter(x=>statusOk(x,c[0])).length+"</i></button>").join("")+"</div>"+
   '<div class="minis"><select class="mini" id="sortsel" aria-label="Sort">'+opt("new","Newest first",ui.sort)+opt("value","Highest value",ui.sort)+opt("low","Lowest value",ui.sort)+opt("name","Name A-Z",ui.sort)+opt("age","Longest in stock",ui.sort)+'</select><select class="mini" id="ownersel" aria-label="Owner">'+opt("","All owners",ui.owner)+opt(P[0],P[0],ui.owner)+opt(P[1],P[1],ui.owner)+opt("Shared","Shared",ui.owner)+"</select></div>"+
@@ -1508,16 +1508,16 @@ async function readBarcodeFromImage(file){
   }
   return null;
 }
-function newCardRow(o){return Object.assign({week_id:state.week.id},cardRow(Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,soldPrice:"",soldDate:"",notes:""},o)))}
+function newCardRow(o,weekId){return Object.assign({week_id:weekId||state.week.id},cardRow(Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,soldPrice:"",soldDate:"",notes:""},o)))}
 // mode "sell": scanning picks cards that are already in the week, then opens Edit many to mark them sold
 function scanModal(mode){
-  const sell=mode==="sell",picked=[];
+  const sell=mode==="sell",picked=[],tw=isPast()?VW():state.week,twName=tw===state.week?"this week":weekRange(tw);
   const session=[],pending=new Set();
   const owners=["Shared",...state.settings.partners];
   const el=modal('<video id="scv" class="fs-video" playsinline muted autoplay></video><div class="fs-tap" id="sctap" role="button" aria-label="Tap to scan"></div><div class="fs-guide" id="scguide"><span>'+(autoSnapOn()?"Hold the front label in the box":"Fit the front label in the box, then tap")+'</span></div>'+
     '<div class="fs-msg" id="scmsg" hidden><p>Camera is off. Allow camera access, or use Photo of label or Type a cert.</p><button class="btn sm" id="scretry" type="button">Try camera again</button></div>'+
     '<div class="fs-flash" id="scflash"></div>'+
-    '<div class="fs-top"><button class="fs-ib" data-act="close-modal" type="button" aria-label="Close">'+ic("plus",22).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+'</button><h2>'+(sell?"Scan to sell":"Scan certs")+'</h2><button class="fs-chip" id="scopt" type="button"'+(sell?" hidden":"")+'></button></div>'+
+    '<div class="fs-top"><button class="fs-ib" data-act="close-modal" type="button" aria-label="Close">'+ic("plus",22).replace("<svg ",'<svg style="transform:rotate(45deg)" ')+'</button><h2>'+(sell?"Scan to sell":tw===state.week?"Scan certs":"Scan into "+esc(weekRange(tw)))+'</h2><button class="fs-chip" id="scopt" type="button"'+(sell?" hidden":"")+'></button></div>'+
     '<div class="fs-extra" id="scopts" hidden><div class="two"><div>'+field("Owner",'<select id="scown">'+owners.map(o=>"<option>"+esc(o)+"</option>").join("")+"</select>")+"</div><div>"+field("Consignor %",'<input id="scpct" type="number" step="0.1" inputmode="decimal" value="'+state.settings.defaultPct+'">')+'</div></div><label class="chk"><input type="checkbox" id="scauto"'+(autoSnapOn()?" checked":"")+'>Snap by itself when the label is held still</label><label class="chk"><input type="checkbox" id="scocr"'+(ocrOn()?" checked":"")+'>Read the card name from the front label</label><label class="chk"><input type="checkbox" id="scpsa"'+(psaAutoOn()?" checked":"")+'>Look up PSA name, grade and photos</label><button class="btn block sm" id="scoptok" type="button" style="margin-top:10px">Done</button></div>'+
     '<div class="fs-extra" id="sctype" hidden><div class="certrow"><input id="scin" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="Type a cert number"><button class="btn" id="scadd" type="button">Add</button></div><p class="tiny">A Bluetooth or USB barcode scanner works without opening this.</p></div>'+
     '<input type="file" id="scph" accept="image/*" capture="environment" hidden>'+
@@ -1565,14 +1565,14 @@ function scanModal(mode){
     }
     const inSess=session.find(x=>x.cert===cert);
     if(inSess){if(desc&&!inSess.title&&inSess.queued){qUpdate(cert,{desc});inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}if(desc&&!inSess.title&&inSess.id){if(await api(sb.from("cards").update({description:desc}).eq("id",inSess.id))){inSess.title=desc;paint();flash("Name added to "+cert,"ok");return}}flash("Already scanned "+cert);return}
-    const ex=state.week.cards.find(c=>c.cert===cert);
-    if(ex){if(desc&&!ex.desc){if(await api(sb.from("cards").update({description:desc}).eq("id",ex.id))){ex.desc=desc;ui.dirty=true;beep(true);hit();flash("Name added to "+cert,"ok");return}}beep(false);flash("Already in this week: "+cert,"warn");return}
+    const ex=tw.cards.find(c=>c.cert===cert);
+    if(ex){if(desc&&!ex.desc){if(await api(sb.from("cards").update({description:desc}).eq("id",ex.id))){ex.desc=desc;ui.dirty=true;beep(true);hit();flash("Name added to "+cert,"ok");return}}beep(false);flash("Already in "+twName+": "+cert,"warn");return}
     const qd=qList().find(x=>x.cert===cert);
     if(qd){if(desc&&!qd.desc){qUpdate(cert,{desc});beep(true);hit();flash("Name added to "+cert,"ok");return}beep(false);flash("Already saved offline: "+cert,"warn");return}
     const fields={cert,desc:desc||"",owner:own.value,pct:+pct.value||state.settings.defaultPct};
     pending.add(cert);
     // with no signal this is saved on the phone and uploads later
-    const r=await api(sb.from("cards").insert(newCardRow(fields)).select("id").single());
+    const r=await api(sb.from("cards").insert(newCardRow(Object.assign(tw===state.week?{}:{date:tw.end||tw.start},fields),tw.id)).select("id").single());
     pending.delete(cert);
     if(!r){beep(false);return}
     if(r.queued){const item={cert,id:r.data&&r.data.id,owner:own.value,title:desc||"",st:"queued",fresh:true};session.unshift(item);ui.dirty=true;beep(true);hit();flash("Saved offline: "+cert+". Uploads when you have signal.","warn");paint();return}
@@ -1999,9 +1999,9 @@ const weekOfEntry=(kind,id)=>[state.week,...state.history].find(x=>x[kind].some(
 // slabs from closed weeks that are still being sold
 const stillSelling=()=>state.history.flatMap(h=>h.cards.filter(c=>c.carried&&!c.sold).map(c=>({c,h})));
 function cardModal(id,carry){
-  const w=(id&&weekOfCard(id))||state.week,c=id?w.cards.find(x=>x.id===id):null;
+  const w=(id&&weekOfCard(id))||(!id&&isPast()?VW():state.week),c=id?w.cards.find(x=>x.id===id):null;
   if(id&&!c){toast("That card was changed or removed");return}
-  const d=c||Object.assign({date:todayISO(),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,saleType:"",soldPrice:"",soldDate:"",tradeCash:"",notes:""},carry||{});
+  const d=c||Object.assign({date:w===state.week?todayISO():(w.end||w.start),cert:"",desc:"",owner:"Shared",mv:"",pct:state.settings.defaultPct,sold:false,saleType:"",soldPrice:"",soldDate:"",tradeCash:"",notes:""},carry||{});
   const dsp=dispOf(d);
   const owners=["Shared",...state.settings.partners];
   const P=state.settings.partners,splitable=!(c&&c.splitDone);
@@ -2013,7 +2013,7 @@ function cardModal(id,carry){
   const recvHTML=dsp==="traded"&&c?'<p class="hint">'+(recv.length?"Received in this trade: "+recv.map(x=>esc(x.desc||("cert "+x.cert))).join(", "):"No received cards added yet.")+'</p><button type="button" class="btn sec sm" id="addrecv">Add received card</button>':'<p class="hint" id="recvhint">'+(c?"":"Save this card first, then add the cards you received.")+'</p><button type="button" class="btn sec sm" id="addrecv" style="display:'+(c?"inline-block":"none")+'">Add received card</button>';
   const sel=v=>dsp===v?" selected":"";
   const fc=c&&attachList(c.id)[0];
-  const el=modal('<div class="ehead"><div class="thumbsm '+(fc?"":ownerCls(d.owner))+'" style="width:48px;height:48px">'+(fc?'<img data-path="'+esc(fc.path)+'" alt="">':ic("cards",22))+'</div><div style="min-width:0"><h2>'+(c?"Edit card":"Add card")+'</h2><div class="hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c?esc(c.desc||"Cert "+(c.cert||"n/a")):"Scan or type the cert to start")+"</div>"+(c?'<div class="pills" style="margin-top:4px"><span class="badge '+ownerCls(c.owner)+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":'<span class="badge ok">In stock</span>')+"</div>":"")+"</div></div>"+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
+  const el=modal('<div class="ehead"><div class="thumbsm '+(fc?"":ownerCls(d.owner))+'" style="width:48px;height:48px">'+(fc?'<img data-path="'+esc(fc.path)+'" alt="">':ic("cards",22))+'</div><div style="min-width:0"><h2>'+(c?"Edit card":w===state.week?"Add card":"Add card to "+esc(weekRange(w)))+'</h2><div class="hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c?esc(c.desc||"Cert "+(c.cert||"n/a")):"Scan or type the cert to start")+"</div>"+(c?'<div class="pills" style="margin-top:4px"><span class="badge '+ownerCls(c.owner)+'">'+esc(c.owner)+"</span>"+(c.sold?(c.saleType==="traded"?'<span class="badge trade">Traded</span>':'<span class="badge sold">Sold</span>'):c.repack?'<span class="badge rp-'+c.repack+'">'+rpLabel(c)+"</span>":'<span class="badge ok">In stock</span>')+"</div>":"")+"</div></div>"+(fromC?'<p class="hint">Received in a trade for '+esc(cardLabel(fromC))+"</p>":"")+'<form id="cf">'+
     '<div class="sech"><h3>Card</h3></div><div class="formbox">'+
     field("PSA cert #",'<div class="certrow"><input name="cert" inputmode="numeric" autocomplete="off" placeholder="Type, scan, or tap Scan" value="'+esc(d.cert)+'"><button type="button" class="btn sec" id="certcam">Scan</button><button type="button" class="btn sec" id="psab">PSA</button></div>'+camHTML("cv")+'<div id="camopts" class="hint" hidden><button class="linkbtn" id="certphb" type="button">Use the phone camera instead</button></div><input type="file" id="certph" accept="image/*" capture="environment" hidden><div class="psast" id="psast"></div>')+
     field("Description",'<input name="desc" placeholder="2023 Charizard ex PSA 10" value="'+esc(d.desc)+'">')+
