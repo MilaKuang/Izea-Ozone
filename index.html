@@ -793,7 +793,7 @@ function conflictsModal(){
 }
 
 // ---------- realtime ----------
-const APP_VERSION=52;
+const APP_VERSION=53;
 let pc=null,rtStatus="",pcStatus="",rtErr="",pcErr="",retryT=null;
 function subscribe(){
   if(!sb||!me)return;
@@ -2385,7 +2385,7 @@ function passwordModal(){
 // ---------- csv import ----------
 function importChooser(){
   const reps=state.settings.repackers;
-  const el=modal('<h2>Import CSV</h2><div id="ic1"><div class="menu"><button class="mi" data-m="sold" type="button">'+ic("cart")+'<span class="mt">What sold<small>Marks the slabs in the file as sold, with their sale prices if the file has them. Also reads the LastPack claims export.</small></span><span class="chev">'+ic("open",18)+'</span></button>'+(isPast()?"":'<button class="mi" data-m="new" type="button">'+ic("plus")+'<span class="mt">New cards we got<small>Adds cards from a repacker export or any list of certs</small></span><span class="chev">'+ic("open",18)+'</span></button>')+(isPast()?"":'<button class="mi" data-m="triumph" type="button">'+ic("check")+'<span class="mt">What a repacker accepted<small>Marks matching cards as accepted, pending or rejected. Adds nothing unless you choose to.</small></span><span class="chev">'+ic("open",18)+'</span></button>')+'</div></div><div id="ic2" hidden><p class="hint" id="ic2t"></p><div class="menu">'+reps.map(n=>'<button class="mi" data-rp="'+esc(n)+'" type="button">'+ic("layers")+'<span class="mt">'+esc(n)+'</span><span class="chev">'+ic("open",18)+"</span></button>").join("")+'<button class="mi" data-rp="" id="icnone" type="button">'+ic("upload")+'<span class="mt">Not from a repacker<small>Just a list of cards we got</small></span><span class="chev">'+ic("open",18)+'</span></button></div></div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
+  const el=modal('<h2>Import CSV</h2><div id="ic1"><div class="menu"><button class="mi" data-m="sold" type="button">'+ic("cart")+'<span class="mt">What sold<small>Marks the slabs in the file as sold, with their sale prices if the file has them. Also reads the LastPack claims export.</small></span><span class="chev">'+ic("open",18)+'</span></button>'+(isPast()?"":'<button class="mi" data-m="new" type="button">'+ic("plus")+'<span class="mt">New cards we got<small>Adds cards from a repacker export or any list of certs</small></span><span class="chev">'+ic("open",18)+'</span></button>')+('<button class="mi" data-m="triumph" type="button">'+ic("check")+'<span class="mt">What a repacker accepted<small>Marks matching cards as accepted, pending or rejected. Adds nothing unless you choose to.</small></span><span class="chev">'+ic("open",18)+'</span></button>')+'</div></div><div id="ic2" hidden><p class="hint" id="ic2t"></p><div class="menu">'+reps.map(n=>'<button class="mi" data-rp="'+esc(n)+'" type="button">'+ic("layers")+'<span class="mt">'+esc(n)+'</span><span class="chev">'+ic("open",18)+"</span></button>").join("")+'<button class="mi" data-rp="" id="icnone" type="button">'+ic("upload")+'<span class="mt">Not from a repacker<small>Just a list of cards we got</small></span><span class="chev">'+ic("open",18)+'</span></button></div></div><div class="actions"><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
   let mode="";
   el.addEventListener("click",e=>{
     const m=e.target.closest("[data-m]");
@@ -2494,14 +2494,14 @@ async function importTriumphStatus(text){
   const iC=ix("cert id","psa cert #","cert"),iS=ix("status"),iCS=H.indexOf("card status"),iA=H.indexOf("approved"),iM=ix("market value"),iR=ix("rate","consignor %"),iT=ix("card title","item description","description");
   if(iC<0){toast("Could not find a cert column in that file");return}
   const hasCols=iS>=0||iCS>=0||iA>=0;
-  const byCert=new Map(state.week.cards.filter(c=>c.cert&&!c.sold).map(c=>[c.cert,c]));
-  const seen=new Set(),changes=[],missing=[];let same=0,soldAlready=0;
+  const TW=VW(),byCert=new Map(TW.cards.filter(c=>c.cert&&!c.sold).map(c=>[c.cert,c]));
+  const seen=new Set(),changes=[],missing=[];let same=0,soldAlready=0,elsewhere=0;
   rows.slice(1).forEach(r=>{
     const cert=normalizeCert(g(r,iC));if(!cert||seen.has(cert))return;seen.add(cert);
     const st=rowRepack(g(r,iS)+" "+g(r,iCS),g(r,iA),hasCols);if(!st)return;
     const mv=iM>=0&&g(r,iM).trim()!==""?parseMoney(g(r,iM)):null,pct=iR>=0&&g(r,iR).trim()!==""?parseMoney(g(r,iR)):null;
     const c=byCert.get(cert);
-    if(!c){if(state.week.cards.some(x=>x.cert===cert&&x.sold))soldAlready++;else missing.push({cert,st,mv,pct,desc:iT>=0?g(r,iT).trim():""});return}
+    if(!c){if(TW.cards.some(x=>x.cert===cert&&x.sold))soldAlready++;else if([state.week,...state.history].some(w=>w!==TW&&w.cards.some(x=>x.cert===cert)))elsewhere++;else missing.push({cert,st,mv,pct,desc:iT>=0?g(r,iT).trim():""});return}
     const patch={};
     const who=ui.importRepacker||state.settings.repackers[0];
     if(c.repack!==st||(state.hasRepacker&&c.repacker!==who)){patch.repack_status=st;patch.repack_date=todayISO();if(state.hasRepacker)patch.repacker=who}
@@ -2512,8 +2512,8 @@ async function importTriumphStatus(text){
   });
   const cnt=k=>changes.filter(x=>x.patch.repack_status===k).length;
   const rpn=ui.importRepacker||state.settings.repackers[0];
-  const el=modal('<h2>What '+esc(rpn)+' accepted</h2><div class="counts"><div><b>'+cnt("accepted")+'</b><span>newly accepted</span></div><div><b>'+cnt("pending")+'</b><span>pending</span></div><div><b>'+cnt("rejected")+'</b><span>rejected</span></div></div><p class="hint">'+(changes.length?changes.length+" card"+(changes.length>1?"s":"")+" in this week will be updated"+(changes.some(x=>x.patch.market_value!=null||x.patch.consignor_pct!=null)?" (some also get the repacker's market value or rate)":"")+".":"No changes needed.")+(same?" "+same+" already up to date.":"")+(soldAlready?" "+soldAlready+" already sold to customers, left alone.":"")+"</p>"+
-    (missing.length?'<label class="chk"><input type="checkbox" id="tiadd">Also add the '+missing.length+" cert"+(missing.length>1?"s":"")+" not in this week</label>":"")+
+  const el=modal('<h2>What '+esc(rpn)+' accepted</h2><div class="counts"><div><b>'+cnt("accepted")+'</b><span>newly accepted</span></div><div><b>'+cnt("pending")+'</b><span>pending</span></div><div><b>'+cnt("rejected")+'</b><span>rejected</span></div></div><p class="hint">'+(changes.length?changes.length+" card"+(changes.length>1?"s":"")+" in "+(TW===state.week?"this week":weekRange(TW))+" will be updated"+(changes.some(x=>x.patch.market_value!=null||x.patch.consignor_pct!=null)?" (some also get the repacker's market value or rate)":"")+".":"No changes needed.")+(same?" "+same+" already up to date.":"")+(soldAlready?" "+soldAlready+" already sold to customers, left alone.":"")+(elsewhere?" "+plural(elsewhere,"cert")+" "+(elsewhere===1?"is":"are")+" in another week, left alone.":"")+"</p>"+
+    (missing.length?'<label class="chk"><input type="checkbox" id="tiadd">Also add the '+missing.length+" cert"+(missing.length>1?"s":"")+" not in "+(TW===state.week?"this week":weekRange(TW))+"</label>":"")+
     '<div class="actions"><button class="btn" id="tigo" type="button"'+(changes.length||missing.length?"":" disabled")+'>Update</button><button class="btn sec" data-act="close-modal" type="button">Cancel</button></div>');
   $("#tigo",el).addEventListener("click",async()=>{
     el.querySelectorAll("button").forEach(b=>b.disabled=true);$("#tigo",el).textContent="Updating...";
@@ -2521,7 +2521,7 @@ async function importTriumphStatus(text){
     for(let k=0;k<changes.length;k+=8){const rs=await Promise.all(changes.slice(k,k+8).map(x=>api(sb.from("cards").update(x.patch).eq("id",x.c.id))));ok+=rs.filter(Boolean).length}
     let added=0;
     if(missing.length&&$("#tiadd",el)&&$("#tiadd",el).checked){
-      const rowsNew=missing.map(m=>newCardRow({cert:m.cert,desc:m.desc,mv:m.mv==null?"":m.mv,pct:m.pct==null?state.settings.defaultPct:m.pct,repack:m.st,repackDate:todayISO(),repacker:rpn}));
+      const rowsNew=missing.map(m=>newCardRow(Object.assign(TW===state.week?{}:{date:TW.end||TW.start},{cert:m.cert,desc:m.desc,mv:m.mv==null?"":m.mv,pct:m.pct==null?state.settings.defaultPct:m.pct,repack:m.st,repackDate:todayISO(),repacker:rpn}),TW.id));
       for(let k=0;k<rowsNew.length;k+=300){if(await api(sb.from("cards").upsert(rowsNew.slice(k,k+300),{onConflict:"week_id,cert",ignoreDuplicates:true})))added+=Math.min(300,rowsNew.length-k)}
     }
     closeModal();await refreshRender();toast(ok+" updated"+(added?", "+added+" added":""));
